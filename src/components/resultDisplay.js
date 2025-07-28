@@ -187,6 +187,21 @@ class ResultDisplay {
             `;
         }
 
+        // Add Enhanced AI analysis results if available
+        if (results.enhancedAI) {
+            html += `
+                <div class="breakdown-item">
+                    <div class="breakdown-label"><i class="fas fa-robot"></i> Enhanced AI Analysis</div>
+                    <div class="breakdown-value ${this.getConfidenceClass(results.enhancedAI.confidence)}">
+                        ${results.enhancedAI.confidence}%
+                    </div>
+                    <div class="breakdown-details">
+                        ${results.enhancedAI.method} - AI Probability: ${(results.enhancedAI.aiProbability * 100).toFixed(1)}%
+                    </div>
+                </div>
+            `;
+        }
+
         // Add MRI-specific analysis if available
         if (results.traditional && results.traditional.mriDetection) {
             const mriDetection = results.traditional.mriDetection;
@@ -250,10 +265,74 @@ class ResultDisplay {
         }
 
         html += '</div>';
+        
+        // Add detailed Enhanced AI breakdown if available
+        if (results.enhancedAI && results.enhancedAI.methods) {
+            html += this.generateEnhancedAIDetailedBreakdown(results.enhancedAI.methods);
+        }
 
         // Add recommendations
         html += this.generateRecommendations(results);
 
+        return html;
+    }
+
+    generateEnhancedAIDetailedBreakdown(methods) {
+        let html = '<div class="enhanced-ai-breakdown">';
+        html += '<h4><i class="fas fa-robot"></i> Enhanced AI Detection Methods</h4>';
+        html += '<div class="enhanced-ai-grid">';
+        
+        const methodNames = {
+            frequencyAnalysis: 'Frequency Analysis',
+            noiseInconsistency: 'Noise Inconsistency',
+            compressionArtifacts: 'Compression Artifacts',
+            statisticalAnomalies: 'Statistical Anomalies',
+            edgeAnalysis: 'Edge Pattern Analysis',
+            textureAnalysis: 'Texture Analysis',
+            colorSpaceAnalysis: 'Color Space Analysis',
+            metadataAnalysis: 'Metadata Analysis',
+            perceptualHashing: 'Perceptual Hashing',
+            deepLearningFeatures: 'Deep Learning Features'
+        };
+        
+        const methodIcons = {
+            frequencyAnalysis: 'fas fa-wave-square',
+            noiseInconsistency: 'fas fa-random',
+            compressionArtifacts: 'fas fa-compress',
+            statisticalAnomalies: 'fas fa-chart-bar',
+            edgeAnalysis: 'fas fa-cut',
+            textureAnalysis: 'fas fa-th',
+            colorSpaceAnalysis: 'fas fa-palette',
+            metadataAnalysis: 'fas fa-info-circle',
+            perceptualHashing: 'fas fa-fingerprint',
+            deepLearningFeatures: 'fas fa-network-wired'
+        };
+        
+        Object.entries(methods).forEach(([methodKey, methodResult]) => {
+            if (methodResult && methodResult.confidence > 0) {
+                html += `
+                    <div class="enhanced-ai-item">
+                        <div class="enhanced-ai-label">
+                            <i class="${methodIcons[methodKey] || 'fas fa-cog'}"></i>
+                            ${methodNames[methodKey] || methodKey}
+                        </div>
+                        <div class="enhanced-ai-value ${this.getConfidenceClass(methodResult.confidence)}">
+                            ${methodResult.confidence}%
+                        </div>
+                        <div class="enhanced-ai-probability">
+                            AI Probability: ${(methodResult.aiProbability * 100).toFixed(1)}%
+                        </div>
+                        ${methodResult.details && methodResult.details.length > 0 ? 
+                            `<div class="enhanced-ai-details">
+                                ${methodResult.details.slice(0, 2).join(', ')}
+                            </div>` : ''
+                        }
+                    </div>
+                `;
+            }
+        });
+        
+        html += '</div></div>';
         return html;
     }
 
