@@ -357,13 +357,14 @@ class ResultDisplay {
         html += `<div class="preprocessing-item"><strong>Target Size:</strong> ${preprocessing.targetSize}</div>`;
         html += '</div>';
         html += '<div class="preprocessing-steps">';
-        html += '<h6>Applied Steps:</h6>';
+        html += '<h6>Applied Steps (Before Classification):</h6>';
         html += '<ul>';
         html += '<li>✓ Converted to grayscale</li>';
         html += '<li>✓ Detected and cropped patient info/overlays</li>';
         html += '<li>✓ Normalized pixel values</li>';
         html += '<li>✓ Resized to standard dimensions</li>';
         html += '</ul>';
+        html += '<p class="preprocessing-note"><i class="fas fa-info-circle"></i> <strong>Note:</strong> Preprocessing was applied before image classification to improve accuracy.</p>';
         html += '</div>';
         html += '</div>';
         return html;

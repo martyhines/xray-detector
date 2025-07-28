@@ -89,11 +89,24 @@ class XRayDetectorApp {
         this.showAnalyzingState();
 
         try {
-            // First, classify the image type
+            // Preprocess image if it's not a DICOM file
+            let processedFile = this.currentFile;
+            let preprocessingStats = null;
+            
+            if (!this.dicomMetadata) {
+                console.log('Preprocessing non-DICOM image before classification...');
+                const imageData = await this.getImageData(this.currentFile);
+                const processedImageData = await this.imagePreprocessor.preprocessImage(imageData, false);
+                processedFile = await this.imageDataToFile(processedImageData, this.currentFile.name);
+                preprocessingStats = this.imagePreprocessor.getPreprocessingStats(imageData, processedImageData);
+                console.log('Preprocessing stats:', preprocessingStats);
+            }
+
+            // Classify the image type (using preprocessed image if available)
             if (!this.imageTypeClassifier) {
                 this.imageTypeClassifier = new ImageTypeClassifier();
             }
-            const classification = await this.imageTypeClassifier.classifyImage(this.currentFile);
+            const classification = await this.imageTypeClassifier.classifyImage(processedFile);
             const classificationMessage = this.imageTypeClassifier.getClassificationMessage(classification);
             
             // Check if it's a medical image
@@ -105,13 +118,16 @@ class XRayDetectorApp {
             
             // If it's medical, proceed with authenticity analysis
             const startTime = Date.now();
-            const result = await this.performAnalysis(this.currentFile);
+            const result = await this.performAnalysis(processedFile);
             const analysisTime = Date.now() - startTime;
 
-            // Add classification info to results
+            // Add classification info and preprocessing stats to results
             result.imageType = classification.type;
             result.imageTypeConfidence = classification.confidence;
             result.classificationDetails = classification.details;
+            if (preprocessingStats) {
+                result.preprocessing = preprocessingStats;
+            }
 
             this.displayResults(result, analysisTime);
         } catch (error) {
@@ -159,24 +175,11 @@ class XRayDetectorApp {
 
     async performAnalysis(file) {
         try {
-            // Preprocess image if it's not a DICOM file
-            let processedFile = file;
-            let preprocessingStats = null;
-            
-            if (!this.dicomMetadata) {
-                console.log('Preprocessing non-DICOM image...');
-                const imageData = await this.getImageData(file);
-                const processedImageData = await this.imagePreprocessor.preprocessImage(imageData, false);
-                processedFile = await this.imageDataToFile(processedImageData, file.name);
-                preprocessingStats = this.imagePreprocessor.getPreprocessingStats(imageData, processedImageData);
-                console.log('Preprocessing stats:', preprocessingStats);
-            }
-
-            // Run traditional analysis, TensorFlow analysis, and enhanced AI analysis
+            // File is already preprocessed at this point, so run analysis directly
             const [traditionalResults, tensorflowResults, enhancedAIResults] = await Promise.all([
-                this.runTraditionalAnalysis(processedFile),
-                this.runTensorFlowAnalysis(processedFile),
-                this.runEnhancedAIAnalysis(processedFile)
+                this.runTraditionalAnalysis(file),
+                this.runTensorFlowAnalysis(file),
+                this.runEnhancedAIAnalysis(file)
             ]);
 
             // Combine results with weighted average
@@ -190,8 +193,7 @@ class XRayDetectorApp {
                 // Include detailed results for the breakdown
                 traditional: traditionalResults,
                 tensorflow: tensorflowResults,
-                enhancedAI: enhancedAIResults,
-                preprocessing: preprocessingStats
+                enhancedAI: enhancedAIResults
             };
         } catch (error) {
             console.error('Analysis error:', error);
