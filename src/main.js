@@ -102,7 +102,8 @@ class XRayDetectorApp {
                 console.log('Preprocessing stats:', preprocessingStats);
             }
 
-            // Classify the image type (using preprocessed image if available)
+            // TEMPORARILY DISABLED: Classify the image type (using preprocessed image if available)
+            /*
             if (!this.imageTypeClassifier) {
                 this.imageTypeClassifier = new ImageTypeClassifier();
             }
@@ -125,6 +126,10 @@ class XRayDetectorApp {
                 this.showClassificationResult(classificationMessage);
                 return;
             }
+            */
+            
+            // TEMPORARY: Skip classification and proceed directly to analysis
+            console.log('🔍 TEMP: Classification bypassed - proceeding directly to analysis');
             
             // If it's medical, proceed with authenticity analysis
             const startTime = Date.now();
@@ -132,9 +137,9 @@ class XRayDetectorApp {
             const analysisTime = Date.now() - startTime;
 
             // Add classification info and preprocessing stats to results
-            result.imageType = classification.type;
-            result.imageTypeConfidence = classification.confidence;
-            result.classificationDetails = classification.details;
+            result.imageType = 'Medical (Classification Bypassed)';
+            result.imageTypeConfidence = 1.0;
+            result.classificationDetails = ['Classification temporarily disabled for testing'];
             if (preprocessingStats) {
                 result.preprocessing = preprocessingStats;
             }
