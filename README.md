@@ -93,6 +93,60 @@ xray-detector/
 - Edge detection analysis
 - Pattern consistency evaluation
 
+🧠 Enhanced AI Detection Overview
+The enhanced AI analysis uses 10 different detection methods to identify AI-generated or manipulated medical images. Each method looks for specific artifacts and patterns that are common in AI-generated content.
+�� The 10 Detection Methods:
+1. **Frequency Domain Analysis**
+What it detects: AI generation artifacts in frequency patterns
+How it works: Analyzes the frequency distribution of image data
+AI indicators: Excessive high-frequency content or abnormally low frequency content
+Confidence: 80-85% when artifacts detected
+2. **Noise Inconsistency Detection**
+What it detects: Unnaturally uniform noise patterns
+How it works: Analyzes noise variance across different image regions
+AI indicators: Extremely uniform noise (AI generators often produce consistent noise)
+Confidence: 85% when uniform noise detected
+3. **Advanced Compression Artifact Detection**
+What it detects: Unusual compression patterns and AI generation signatures
+How it works: Analyzes JPEG compression artifacts and block variance
+AI indicators: Unusual compression ratios or patterns not typical of real cameras
+Confidence: 75-80% when suspicious patterns found
+4. **Statistical Anomaly Detection**
+What it detects: Statistical patterns that deviate from natural images
+How it works: Analyzes pixel distribution, entropy, and statistical signatures
+AI indicators: Unusual pixel distributions or entropy patterns
+Confidence: 70-80% when anomalies detected
+5. **Edge Pattern Analysis**
+What it detects: AI-generated edge artifacts
+How it works: Uses edge detection algorithms to find unnatural edge patterns
+AI indicators: Overly smooth or artificial-looking edges
+Confidence: 75% when edge artifacts found
+6. **Texture Pattern Analysis**
+What it detects: AI-generated texture artifacts
+How it works: Analyzes texture patterns across the image
+AI indicators: Repetitive or artificial texture patterns
+Confidence: 70% when texture artifacts detected
+7. **Color Space Analysis**
+What it detects: Color space anomalies
+How it works: Analyzes color distribution and color space patterns
+AI indicators: Unusual color distributions or color space artifacts
+Confidence: 65-75% when anomalies found
+8. **Metadata Pattern Analysis**
+What it detects: Suspicious metadata patterns
+How it works: Analyzes file metadata for AI generation indicators
+AI indicators: Unusual file properties, timestamps, or metadata patterns
+Confidence: 60-70% when suspicious patterns found
+9. **Perceptual Hashing**
+What it detects: Similarity to known AI generation patterns
+How it works: Generates perceptual hashes and compares with known patterns
+AI indicators: Similarity to known AI-generated image hashes
+Confidence: 70-80% when matches found
+10. **Deep Learning Features**
+What it detects: Deep learning model signatures
+How it works: Extracts and analyzes deep learning feature patterns
+AI indicators: Patterns typical of specific AI models
+Confidence: 75-85% when signatures detected
+
 ### Confidence Scoring
 
 The application provides confidence scores from 0-100%:
