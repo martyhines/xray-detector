@@ -5,15 +5,19 @@ A modern web application for detecting AI-generated or doctored X-ray images. Th
 ## Features
 
 - **Drag & Drop Upload**: Easy image upload with drag-and-drop functionality
+- **DICOM File Support**: Native support for medical DICOM (.dcm) files with metadata analysis
 - **Real-time Analysis**: Advanced image analysis using multiple detection methods
 - **Beautiful UI**: Modern, responsive design with smooth animations
 - **Detailed Results**: Comprehensive analysis with confidence scores and breakdowns
+- **Enhanced AI Detection**: 10 sophisticated detection methods for AI-generated content
+- **Medical Metadata Analysis**: Extracts and validates DICOM metadata for authenticity
 - **Multiple Detection Methods**:
   - Metadata analysis
   - Noise pattern detection
   - Compression artifact analysis
   - Statistical pattern analysis
   - Frequency domain analysis
+  - DICOM-specific validation
 
 ## How It Works
 
@@ -24,6 +28,13 @@ The application uses several sophisticated techniques to detect AI-generated or 
 3. **Compression Artifact Analysis**: Detects unusual compression patterns that may indicate manipulation
 4. **Statistical Analysis**: Examines pixel distribution and entropy patterns
 5. **Frequency Domain Analysis**: Looks for patterns in the frequency domain that may indicate AI generation
+6. **DICOM Metadata Analysis**: For DICOM files, extracts and validates medical metadata including:
+   - Patient information (anonymized)
+   - Study and series information
+   - Device manufacturer and model
+   - Acquisition parameters (KVP, exposure, etc.)
+   - Temporal consistency validation
+   - Modality-specific pattern analysis
 
 ## Getting Started
 
@@ -42,9 +53,33 @@ The application uses several sophisticated techniques to detect AI-generated or 
 
 ### File Requirements
 
-- **Supported formats**: JPEG, PNG, BMP, TIFF
+#### Supported File Formats
+
+**Standard Image Formats:**
+- **JPEG/JPG** - Joint Photographic Experts Group
+- **PNG** - Portable Network Graphics  
+- **BMP** - Bitmap Image
+- **TIFF** - Tagged Image File Format
 - **Maximum file size**: 10MB
-- **Image type**: X-ray or medical images
+
+**Medical Imaging Formats:**
+- **DICOM (.dcm)** - Digital Imaging and Communications in Medicine
+- **Maximum file size**: 100MB
+- **Features**: Includes metadata analysis for enhanced detection
+
+#### Recommended Format
+**DICOM files** are highly recommended as they provide the most comprehensive analysis with:
+- Rich medical metadata extraction
+- Device fingerprinting capabilities
+- Acquisition parameter validation
+- Temporal consistency checks
+- Modality-specific pattern analysis
+
+#### Image Types
+- X-ray images
+- MRI scans
+- CT scans
+- Other medical imaging modalities
 
 ## Project Structure
 

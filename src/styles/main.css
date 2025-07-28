@@ -99,6 +99,123 @@ body {
     margin-bottom: 2rem;
 }
 
+/* File Format Support Section */
+.file-formats-section {
+    margin-top: 30px;
+    padding: 25px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #667eea;
+    backdrop-filter: blur(10px);
+}
+
+.file-formats-section h4 {
+    color: #2d3748;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.file-formats-section h4 i {
+    color: #667eea;
+}
+
+.format-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 25px;
+    margin-bottom: 20px;
+}
+
+.format-category {
+    padding: 20px;
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 10px;
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.format-category:hover {
+    background: rgba(248, 249, 250, 0.95);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.format-category h5 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.format-category h5 i {
+    color: #667eea;
+}
+
+.format-category ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 15px 0;
+}
+
+.format-category li {
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+    color: #6c757d;
+    transition: color 0.3s ease;
+}
+
+.format-category li:last-child {
+    border-bottom: none;
+}
+
+.format-category li:hover {
+    color: #495057;
+}
+
+.format-category li strong {
+    color: #2d3748;
+}
+
+.format-note {
+    font-size: 0.9rem;
+    color: #6c757d;
+    font-style: italic;
+    margin: 10px 0 5px 0;
+}
+
+.format-features {
+    font-size: 0.9rem;
+    color: #28a745;
+    font-weight: 500;
+    margin: 5px 0 0 0;
+}
+
+.format-info {
+    padding: 15px;
+    background: rgba(231, 243, 255, 0.8);
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.format-info p {
+    margin: 0;
+    color: #0056b3;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.format-info p i {
+    color: #667eea;
+}
+
 /* Buttons */
 .btn {
     padding: 12px 24px;
@@ -406,6 +523,29 @@ body {
     
     .meter-value {
         text-align: center;
+    }
+
+    /* File format responsive design */
+    .format-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .file-formats-section {
+        padding: 20px;
+        margin-top: 20px;
+    }
+    
+    .format-category {
+        padding: 15px;
+    }
+    
+    .file-formats-section h4 {
+        font-size: 1.1rem;
+    }
+    
+    .format-category h5 {
+        font-size: 1rem;
     }
 }
 
