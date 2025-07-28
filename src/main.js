@@ -5,6 +5,7 @@ class XRayDetectorApp {
         this.isAnalyzing = false;
         this.imageTypeClassifier = null;
         this.isInClassificationMode = false;
+        this.imagePreprocessor = null;
         this.init();
     }
 
@@ -12,6 +13,8 @@ class XRayDetectorApp {
         this.setupEventListeners();
         // Initialize the image type classifier
         this.imageTypeClassifier = new ImageTypeClassifier();
+        // Initialize the image preprocessor
+        this.imagePreprocessor = new ImagePreprocessor();
         console.log('X-Ray Detector App initialized');
     }
 
@@ -156,11 +159,24 @@ class XRayDetectorApp {
 
     async performAnalysis(file) {
         try {
+            // Preprocess image if it's not a DICOM file
+            let processedFile = file;
+            let preprocessingStats = null;
+            
+            if (!this.dicomMetadata) {
+                console.log('Preprocessing non-DICOM image...');
+                const imageData = await this.getImageData(file);
+                const processedImageData = await this.imagePreprocessor.preprocessImage(imageData, false);
+                processedFile = await this.imageDataToFile(processedImageData, file.name);
+                preprocessingStats = this.imagePreprocessor.getPreprocessingStats(imageData, processedImageData);
+                console.log('Preprocessing stats:', preprocessingStats);
+            }
+
             // Run traditional analysis, TensorFlow analysis, and enhanced AI analysis
             const [traditionalResults, tensorflowResults, enhancedAIResults] = await Promise.all([
-                this.runTraditionalAnalysis(file),
-                this.runTensorFlowAnalysis(file),
-                this.runEnhancedAIAnalysis(file)
+                this.runTraditionalAnalysis(processedFile),
+                this.runTensorFlowAnalysis(processedFile),
+                this.runEnhancedAIAnalysis(processedFile)
             ]);
 
             // Combine results with weighted average
@@ -174,7 +190,8 @@ class XRayDetectorApp {
                 // Include detailed results for the breakdown
                 traditional: traditionalResults,
                 tensorflow: tensorflowResults,
-                enhancedAI: enhancedAIResults
+                enhancedAI: enhancedAIResults,
+                preprocessing: preprocessingStats
             };
         } catch (error) {
             console.error('Analysis error:', error);
@@ -414,6 +431,43 @@ class XRayDetectorApp {
         }
         
         this.showUploadSection();
+    }
+
+    // Helper method to convert file to ImageData
+    async getImageData(file) {
+        return new Promise((resolve) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                resolve(imageData);
+            };
+            
+            img.src = URL.createObjectURL(file);
+        });
+    }
+
+    // Helper method to convert ImageData back to File
+    async imageDataToFile(imageData, originalFileName) {
+        return new Promise((resolve) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = imageData.width;
+            canvas.height = imageData.height;
+            ctx.putImageData(imageData, 0, 0);
+            
+            canvas.toBlob((blob) => {
+                const fileName = originalFileName.replace(/\.[^/.]+$/, '_processed.png');
+                const file = new File([blob], fileName, { type: 'image/png' });
+                resolve(file);
+            }, 'image/png');
+        });
     }
 }
 

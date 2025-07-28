@@ -266,6 +266,11 @@ class ResultDisplay {
 
         html += '</div>';
         
+        // Add preprocessing info if available
+        if (results.preprocessing) {
+            html += this.generatePreprocessingHTML(results.preprocessing);
+        }
+
         // Add detailed Enhanced AI breakdown if available
         if (results.enhancedAI && results.enhancedAI.methods) {
             html += this.generateEnhancedAIDetailedBreakdown(results.enhancedAI.methods);
@@ -340,6 +345,28 @@ class ResultDisplay {
         if (confidence >= 70) return 'confidence-high';
         if (confidence >= 40) return 'confidence-medium';
         return 'confidence-low';
+    }
+
+    generatePreprocessingHTML(preprocessing) {
+        let html = '<div class="preprocessing-info">';
+        html += '<h5><i class="fas fa-cogs"></i> Image Preprocessing</h5>';
+        html += '<div class="preprocessing-details">';
+        html += `<div class="preprocessing-item"><strong>Original Size:</strong> ${preprocessing.originalSize}</div>`;
+        html += `<div class="preprocessing-item"><strong>Processed Size:</strong> ${preprocessing.processedSize}</div>`;
+        html += `<div class="preprocessing-item"><strong>Size Reduction:</strong> ${preprocessing.sizeReduction}</div>`;
+        html += `<div class="preprocessing-item"><strong>Target Size:</strong> ${preprocessing.targetSize}</div>`;
+        html += '</div>';
+        html += '<div class="preprocessing-steps">';
+        html += '<h6>Applied Steps:</h6>';
+        html += '<ul>';
+        html += '<li>✓ Converted to grayscale</li>';
+        html += '<li>✓ Detected and cropped patient info/overlays</li>';
+        html += '<li>✓ Normalized pixel values</li>';
+        html += '<li>✓ Resized to standard dimensions</li>';
+        html += '</ul>';
+        html += '</div>';
+        html += '</div>';
+        return html;
     }
 
     generateRecommendations(results) {
