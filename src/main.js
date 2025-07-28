@@ -4,6 +4,7 @@ class XRayDetectorApp {
         this.currentFile = null;
         this.isAnalyzing = false;
         this.imageTypeClassifier = null;
+        this.isInClassificationMode = false;
         this.init();
     }
 
@@ -44,6 +45,8 @@ class XRayDetectorApp {
             return;
         }
 
+        // Reset any previous state
+        this.isInClassificationMode = false;
         this.currentFile = file;
         this.displayImagePreview(file);
         this.showPreviewSection();
@@ -90,6 +93,7 @@ class XRayDetectorApp {
             
             // Check if it's a medical image
             if (!classificationMessage.canProceed) {
+                this.isInClassificationMode = true;
                 this.showClassificationResult(classificationMessage);
                 return;
             }
@@ -131,7 +135,7 @@ class XRayDetectorApp {
                     <p>${classificationMessage.message}</p>
                     ${classificationMessage.details ? `<p class="classification-details"><strong>Details:</strong> ${classificationMessage.details}</p>` : ''}
                     <div class="classification-actions">
-                        <button class="btn btn-primary" onclick="resetUpload()">
+                        <button class="btn btn-primary" onclick="window.app.resetUpload()">
                             <i class="fas fa-upload"></i> Upload Medical Image
                         </button>
                     </div>
@@ -361,6 +365,8 @@ class XRayDetectorApp {
 
     resetUpload() {
         this.currentFile = null;
+        this.isAnalyzing = false;
+        this.isInClassificationMode = false;
         
         // Clear preview image
         const previewImage = document.getElementById('previewImage');
@@ -399,6 +405,12 @@ class XRayDetectorApp {
             breakdownSection.remove();
         }
         
+        // Reset file input
+        const fileInput = document.getElementById('fileInput');
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        
         this.showUploadSection();
     }
 }
@@ -411,8 +423,8 @@ function analyzeImage() {
 }
 
 function resetUpload() {
-    if (window.app && window.app.uploadHandler) {
-        window.app.uploadHandler.resetUpload();
+    if (window.app) {
+        window.app.resetUpload();
     }
 }
 
