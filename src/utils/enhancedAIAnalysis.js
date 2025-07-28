@@ -1,17 +1,23 @@
 // Enhanced AI Analysis for Medical Image Authenticity Detection
 class EnhancedAIAnalyzer {
     constructor() {
+        // Initialize detection methods after all methods are defined
+        this.detectionMethods = {};
+        this.initializeDetectionMethods();
+    }
+
+    initializeDetectionMethods() {
         this.detectionMethods = {
-            frequencyAnalysis: this.analyzeFrequencyArtifacts.bind(this),
-            noiseInconsistency: this.analyzeNoiseInconsistency.bind(this),
-            compressionArtifacts: this.analyzeCompressionArtifacts.bind(this),
-            statisticalAnomalies: this.analyzeStatisticalAnomalies.bind(this),
-            edgeAnalysis: this.analyzeEdgePatterns.bind(this),
-            textureAnalysis: this.analyzeTexturePatterns.bind(this),
-            colorSpaceAnalysis: this.analyzeColorSpace.bind(this),
-            metadataAnalysis: this.analyzeMetadataPatterns.bind(this),
-            perceptualHashing: this.perceptualHashAnalysis.bind(this),
-            deepLearningFeatures: this.analyzeDeepLearningFeatures.bind(this)
+            frequencyAnalysis: (imageData) => this.analyzeFrequencyArtifacts(imageData),
+            noiseInconsistency: (imageData) => this.analyzeNoiseInconsistency(imageData),
+            compressionArtifacts: (imageData) => this.analyzeCompressionArtifacts(imageData),
+            statisticalAnomalies: (imageData) => this.analyzeStatisticalAnomalies(imageData),
+            edgeAnalysis: (imageData) => this.analyzeEdgePatterns(imageData),
+            textureAnalysis: (imageData) => this.analyzeTexturePatterns(imageData),
+            colorSpaceAnalysis: (imageData) => this.analyzeColorSpace(imageData),
+            metadataAnalysis: (file) => this.analyzeMetadataPatterns(file),
+            perceptualHashing: (imageData) => this.perceptualHashAnalysis(imageData),
+            deepLearningFeatures: (imageData) => this.analyzeDeepLearningFeatures(imageData)
         };
     }
 
