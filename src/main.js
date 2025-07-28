@@ -106,8 +106,18 @@ class XRayDetectorApp {
             if (!this.imageTypeClassifier) {
                 this.imageTypeClassifier = new ImageTypeClassifier();
             }
+            
+            console.log('🔍 CLASSIFICATION DEBUG: Starting image classification...');
+            console.log('🔍 CLASSIFICATION DEBUG: File type:', this.currentFile.type);
+            console.log('🔍 CLASSIFICATION DEBUG: File name:', this.currentFile.name);
+            console.log('🔍 CLASSIFICATION DEBUG: Is DICOM:', !!this.dicomMetadata);
+            console.log('🔍 CLASSIFICATION DEBUG: Was preprocessed:', !!preprocessingStats);
+            
             const classification = await this.imageTypeClassifier.classifyImage(processedFile);
+            console.log('🔍 CLASSIFICATION DEBUG: Raw classification result:', classification);
+            
             const classificationMessage = this.imageTypeClassifier.getClassificationMessage(classification);
+            console.log('🔍 CLASSIFICATION DEBUG: Classification message:', classificationMessage);
             
             // Check if it's a medical image
             if (!classificationMessage.canProceed) {

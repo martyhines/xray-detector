@@ -66,11 +66,13 @@ class ImageTypeClassifier {
     }
 
     async classifyImage(file) {
-        console.log('Starting image classification...');
+        console.log('🔍 CLASSIFIER DEBUG: Starting image classification...');
+        console.log('🔍 CLASSIFIER DEBUG: File size:', file.size, 'bytes');
+        console.log('🔍 CLASSIFIER DEBUG: File type:', file.type);
         
         // Ensure worker is ready
         if (!this.isWorkerReady) {
-            console.log('Worker not ready, initializing...');
+            console.log('🔍 CLASSIFIER DEBUG: Worker not ready, initializing...');
             await this.initWorker();
         }
 
@@ -88,9 +90,12 @@ class ImageTypeClassifier {
 
         try {
             // Convert file to ImageData for worker
+            console.log('🔍 CLASSIFIER DEBUG: Converting file to ImageData...');
             const imageData = await this.fileToImageData(file);
+            console.log('🔍 CLASSIFIER DEBUG: ImageData created - width:', imageData.width, 'height:', imageData.height);
             
             // Send classification request to worker
+            console.log('🔍 CLASSIFIER DEBUG: Sending classification request to worker...');
             return new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     reject(new Error('Image type classification timeout'));
@@ -103,10 +108,12 @@ class ImageTypeClassifier {
                     if (type === 'complete') {
                         clearTimeout(timeout);
                         this.worker.removeEventListener('message', resultHandler);
+                        console.log('🔍 CLASSIFIER DEBUG: Classification completed:', results);
                         resolve(results);
                     } else if (type === 'error') {
                         clearTimeout(timeout);
                         this.worker.removeEventListener('message', resultHandler);
+                        console.error('🔍 CLASSIFIER DEBUG: Classification error:', error);
                         reject(new Error(error));
                     }
                 };

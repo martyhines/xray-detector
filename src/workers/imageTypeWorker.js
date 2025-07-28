@@ -29,11 +29,19 @@ async function preprocessImage(imageData) {
 // Classify image type using comprehensive analysis
 async function classifyImageType(imageInfo) {
     try {
+        console.log('🔍 WORKER DEBUG: Starting image type classification...');
+        console.log('🔍 WORKER DEBUG: Image dimensions:', imageInfo.width, 'x', imageInfo.height);
+        console.log('🔍 WORKER DEBUG: Total pixels:', imageInfo.totalPixels);
+        
         // Extract comprehensive features for classification
+        console.log('🔍 WORKER DEBUG: Extracting classification features...');
         const features = extractClassificationFeatures(imageInfo);
+        console.log('🔍 WORKER DEBUG: Extracted features:', features);
         
         // Determine image type based on features
+        console.log('🔍 WORKER DEBUG: Determining image type...');
         const classification = determineImageType(features);
+        console.log('🔍 WORKER DEBUG: Final classification:', classification);
         
         return {
             type: classification.type,
@@ -42,7 +50,7 @@ async function classifyImageType(imageInfo) {
             features: features
         };
     } catch (error) {
-        console.error('Classification error:', error);
+        console.error('🔍 WORKER DEBUG: Classification error:', error);
         // Return a safe default classification
         return {
             type: 'Non-Medical',
@@ -57,6 +65,9 @@ async function classifyImageType(imageInfo) {
 function extractClassificationFeatures(imageInfo) {
     try {
         const { width, height, data, totalPixels } = imageInfo;
+        
+        console.log('🔍 FEATURE DEBUG: Extracting features from image...');
+        console.log('🔍 FEATURE DEBUG: Sample rate: 4 (every 4th pixel)');
         
         // Sample pixels for analysis (every 4th pixel for performance)
         const sampleRate = 4;
@@ -95,6 +106,9 @@ function extractClassificationFeatures(imageInfo) {
         const min = Math.min(...pixelValues);
         const max = Math.max(...pixelValues);
         const range = max - min;
+        
+        console.log('🔍 FEATURE DEBUG: Color analysis - grayscale pixels:', grayscalePixels, 'color pixels:', colorPixels, 'total samples:', totalSamples);
+        console.log('🔍 FEATURE DEBUG: Statistics - mean:', mean.toFixed(3), 'std:', std.toFixed(3), 'min:', min.toFixed(3), 'max:', max.toFixed(3), 'range:', range.toFixed(3));
         
         // Edge analysis
         const edgeFeatures = analyzeEdges(imageInfo);
@@ -419,12 +433,12 @@ function determineImageType(features) {
     // Determine primary classification
     let type, confidence;
     
-    console.log('Classification scores:', {
-        medicalScore,
-        nonMedicalScore,
-        xrayScore,
-        mriScore,
-        ctScore
+    console.log('🔍 SCORE DEBUG: Classification scores:', {
+        medicalScore: medicalScore.toFixed(3),
+        nonMedicalScore: nonMedicalScore.toFixed(3),
+        xrayScore: xrayScore.toFixed(3),
+        mriScore: mriScore.toFixed(3),
+        ctScore: ctScore.toFixed(3)
     });
     
     if (medicalScore > nonMedicalScore && medicalScore > 0.7) {
@@ -462,7 +476,11 @@ function determineImageType(features) {
         details.push('Appears to be a non-medical image (photo, illustration, object)');
     }
     
-    console.log('Final classification:', { type, confidence, details });
+    console.log('🔍 FINAL DEBUG: Final classification:', { 
+        type, 
+        confidence: confidence.toFixed(3), 
+        details: details.slice(0, 3) // Show first 3 details
+    });
     
     return {
         type,
