@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-Ray Authenticity Detector</title>
+    <link rel="stylesheet" href="src/styles/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@1.5.1/dist/tfjs-vis.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="container">
+                <h1 class="logo">
+                    <i class="fas fa-x-ray"></i>
+                    Medical Image Authenticity Detector
+                </h1>
+                <p class="subtitle">Detect AI-generated or doctored X-ray, MRI, and CT scan images</p>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="container">
+                <div class="upload-section">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h3>Upload Medical Image</h3>
+                            <p>Drag and drop your X-ray, MRI, or CT scan image here, or click to browse</p>
+                            <input type="file" id="fileInput" accept="image/*" hidden>
+                            <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                Choose File
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="preview-section" id="previewSection" style="display: none;">
+                    <div class="image-preview">
+                        <img id="previewImage" alt="X-Ray Preview">
+                        <div class="image-overlay">
+                            <button class="btn btn-secondary" onclick="resetUpload()">
+                                <i class="fas fa-times"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-large" onclick="analyzeImage()">
+                        <i class="fas fa-search"></i> Analyze Image
+                    </button>
+                </div>
+
+                <div class="results-section" id="resultsSection" style="display: none;">
+                    <div class="result-card">
+                        <h3><i class="fas fa-chart-line"></i> Analysis Results</h3>
+                        <div class="result-content">
+                            <div class="confidence-meter">
+                                <div class="meter-label">Authenticity Confidence</div>
+                                <div class="meter-container">
+                                    <div class="meter-bar">
+                                        <div class="meter-fill" id="confidenceBar"></div>
+                                    </div>
+                                    <span class="meter-value" id="confidenceValue">0%</span>
+                                </div>
+                            </div>
+                            <div class="result-details">
+                                <div class="result-item">
+                                    <span class="label"><i class="fas fa-info-circle"></i> Status:</span>
+                                    <span class="value" id="statusValue">Analyzing...</span>
+                                </div>
+                                <div class="result-item">
+                                    <span class="label"><i class="fas fa-clock"></i> Analysis Time:</span>
+                                    <span class="value" id="analysisTime">-</span>
+                                </div>
+                                <div class="result-item">
+                                    <span class="label"><i class="fas fa-brain"></i> AI Model:</span>
+                                    <span class="value" id="modelStatus">Loading...</span>
+                                </div>
+                            </div>
+                            <div class="result-actions">
+                                <button class="btn btn-primary" onclick="analyzeNewImage()">
+                                    <i class="fas fa-plus"></i> New Analysis
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <div class="info-card">
+                        <h3><i class="fas fa-info-circle"></i> How It Works</h3>
+                        <p>Our advanced AI analyzes medical images (X-rays, MRIs, and CT scans) for signs of manipulation, AI generation, or doctoring. The system examines various factors including:</p>
+                        <ul>
+                            <li>AI-powered deep learning analysis</li>
+                            <li>Image type detection (X-ray vs MRI vs CT)</li>
+                            <li>MRI-specific analysis (slice thickness, artifacts, contrast)</li>
+                            <li>CT-specific analysis (Hounsfield units, beam hardening, metal artifacts)</li>
+                            <li>Image metadata and compression artifacts</li>
+                            <li>Statistical patterns and noise analysis</li>
+                            <li>Anatomical consistency and medical plausibility</li>
+                            <li>AI generation fingerprints and artifacts</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2024 X-Ray Authenticity Detector. For medical professionals and researchers.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="src/utils/imageAnalysis.js"></script>
+    <script src="src/utils/imageTypeClassifier.js"></script>
+    <script src="src/utils/tensorflowAnalysis.js"></script>
+    <script src="src/components/uploadHandler.js"></script>
+    <script src="src/components/resultDisplay.js"></script>
+    <script src="src/main.js"></script>
+</body>
+</html> 
