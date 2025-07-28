@@ -20,8 +20,8 @@ class XRayDetectorApp {
         this.uploadHandler = new UploadHandler();
         
         // Listen for file selection events from upload handler
-        this.uploadHandler.onFileSelected = (file) => {
-            this.handleFileSelect(file);
+        this.uploadHandler.onFileSelected = (file, dicomMetadata) => {
+            this.handleFileSelect(file, dicomMetadata);
         };
         
         // Listen for reset events from upload handler
@@ -30,7 +30,7 @@ class XRayDetectorApp {
         };
     }
 
-    handleFileSelect(file) {
+    handleFileSelect(file, dicomMetadata = null) {
         if (!file) return;
 
         // Validate file type
@@ -39,15 +39,17 @@ class XRayDetectorApp {
             return;
         }
 
-        // Validate file size (max 10MB)
-        if (file.size > 10 * 1024 * 1024) {
-            this.showError('File size must be less than 10MB.');
+        // Validate file size (max 100MB for DICOM)
+        const maxSize = dicomMetadata ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+            this.showError(`File size must be less than ${dicomMetadata ? '100MB' : '10MB'}.`);
             return;
         }
 
         // Reset any previous state
         this.isInClassificationMode = false;
         this.currentFile = file;
+        this.dicomMetadata = dicomMetadata;
         this.displayImagePreview(file);
         this.showPreviewSection();
     }

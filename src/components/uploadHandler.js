@@ -1,8 +1,10 @@
 // Upload Handler Component
 class UploadHandler {
     constructor() {
-        this.supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/bmp', 'image/tiff'];
-        this.maxFileSize = 10 * 1024 * 1024; // 10MB
+        this.supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/bmp', 'image/tiff', 'application/dicom', 'application/octet-stream'];
+        this.supportedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.dcm'];
+        this.maxFileSize = 100 * 1024 * 1024; // 100MB for DICOM files
+        this.dicomParser = null;
         this.init();
     }
 
@@ -72,37 +74,67 @@ class UploadHandler {
         this.handleFiles(files);
     }
 
-    handleFiles(files) {
+    async handleFiles(files) {
         if (files.length === 0) return;
 
         const file = files[0]; // Only handle the first file
         
         // Validate file
-        const validation = this.validateFile(file);
+        const validation = await this.validateFile(file);
         if (!validation.valid) {
             this.showError(validation.message);
             return;
         }
 
         // Process the file
-        this.processFile(file);
+        await this.processFile(file, validation.isDICOM);
     }
 
-    validateFile(file) {
+    async validateFile(file) {
         // Check if file exists
         if (!file) {
             return { valid: false, message: 'No file selected.' };
         }
 
-        // Check file type
-        if (!this.supportedTypes.includes(file.type)) {
+        // Check file extension
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        const isDICOM = fileExtension === '.dcm' || file.name.toLowerCase().endsWith('.dcm');
+        
+        // For DICOM files, we'll do additional validation
+        if (isDICOM) {
+            // Check file size
+            if (file.size > this.maxFileSize) {
+                return { 
+                    valid: false, 
+                    message: `DICOM file too large. Maximum size is ${this.formatFileSize(this.maxFileSize)}.` 
+                };
+            }
+            
+            // Validate DICOM format
+            try {
+                if (!this.dicomParser) {
+                    this.dicomParser = new DICOMParser();
+                }
+                const isDICOMFile = await this.dicomParser.isDICOMFile(file);
+                if (!isDICOMFile) {
+                    return { valid: false, message: 'Invalid DICOM file format.' };
+                }
+            } catch (error) {
+                return { valid: false, message: 'Error validating DICOM file.' };
+            }
+            
+            return { valid: true, isDICOM: true };
+        }
+
+        // For regular images
+        if (!this.supportedTypes.includes(file.type) && !this.supportedExtensions.includes(fileExtension)) {
             return { 
                 valid: false, 
-                message: `Unsupported file type. Please upload: ${this.supportedTypes.join(', ')}` 
+                message: `Unsupported file type. Please upload: ${this.supportedExtensions.join(', ')} or DICOM (.dcm) files.` 
             };
         }
 
-        // Check file size
+        // Check file size for regular images
         if (file.size > this.maxFileSize) {
             return { 
                 valid: false, 
@@ -111,11 +143,11 @@ class UploadHandler {
         }
 
         // Check if file is actually an image
-        if (!file.type.startsWith('image/')) {
-            return { valid: false, message: 'Selected file is not an image.' };
+        if (!file.type.startsWith('image/') && !isDICOM) {
+            return { valid: false, message: 'Selected file is not a supported image or DICOM format.' };
         }
 
-        return { valid: true };
+        return { valid: true, isDICOM: false };
     }
 
     formatFileSize(bytes) {
@@ -126,17 +158,54 @@ class UploadHandler {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    async processFile(file) {
+    async processFile(file, isDICOM = false) {
         try {
             // Show loading state
             this.showLoadingState();
 
-            // Store file reference
-            this.currentFile = file;
+            let processedFile = file;
+            let dicomMetadata = null;
+
+            // If it's a DICOM file, parse it and convert to canvas
+            if (isDICOM) {
+                try {
+                    if (!this.dicomParser) {
+                        this.dicomParser = new DICOMParser();
+                    }
+                    
+                    const dicomResult = await this.dicomParser.parseDICOMFile(file);
+                    if (!dicomResult.success) {
+                        throw new Error(dicomResult.error || 'Failed to parse DICOM file');
+                    }
+                    
+                    // Convert canvas to blob for processing
+                    const canvas = dicomResult.canvas;
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    
+                    // Create a new file object from the blob
+                    processedFile = new File([blob], file.name.replace('.dcm', '.png'), {
+                        type: 'image/png',
+                        lastModified: Date.now()
+                    });
+                    
+                    // Store DICOM metadata
+                    dicomMetadata = dicomResult.metadata;
+                    
+                } catch (dicomError) {
+                    console.error('DICOM processing error:', dicomError);
+                    this.showError('Error processing DICOM file. Please try again.');
+                    this.hideLoadingState();
+                    return;
+                }
+            }
+
+            // Store file reference and metadata
+            this.currentFile = processedFile;
+            this.dicomMetadata = dicomMetadata;
 
             // Notify main app about file selection
             if (this.onFileSelected) {
-                this.onFileSelected(file);
+                this.onFileSelected(processedFile, dicomMetadata);
             }
 
             // Hide loading state

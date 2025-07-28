@@ -11,6 +11,9 @@
     <!-- TensorFlow.js -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@1.5.1/dist/tfjs-vis.min.js"></script>
+    
+    <!-- DICOM Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/dicom-parser@1.8.26/dist/dicomParser.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -31,8 +34,8 @@
                         <div class="upload-content">
                             <i class="fas fa-cloud-upload-alt"></i>
                             <h3>Upload Medical Image</h3>
-                            <p>Drag and drop your X-ray, MRI, or CT scan image here, or click to browse</p>
-                            <input type="file" id="fileInput" accept="image/*" hidden>
+                            <p>Drag and drop your X-ray, MRI, CT scan, or DICOM (.dcm) file here, or click to browse</p>
+                            <input type="file" id="fileInput" accept="image/*,.dcm" hidden>
                             <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
                                 Choose File
                             </button>
@@ -120,6 +123,7 @@
     <script src="src/utils/imageTypeClassifier.js"></script>
     <script src="src/utils/tensorflowAnalysis.js"></script>
     <script src="src/utils/enhancedAIAnalysis.js"></script>
+    <script src="src/utils/dicomParser.js"></script>
     <script src="src/components/uploadHandler.js"></script>
     <script src="src/components/resultDisplay.js"></script>
     <script src="src/main.js"></script>
