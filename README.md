@@ -93,9 +93,10 @@ xray-detector/
 - Edge detection analysis
 - Pattern consistency evaluation
 
-🧠 Enhanced AI Detection Overview
+## 🧠 Enhanced AI Detection Overview
 The enhanced AI analysis uses 10 different detection methods to identify AI-generated or manipulated medical images. Each method looks for specific artifacts and patterns that are common in AI-generated content.
-�� The 10 Detection Methods:
+
+The 10 Detection Methods:
 1. **Frequency Domain Analysis**
 What it detects: AI generation artifacts in frequency patterns
 How it works: Analyzes the frequency distribution of image data
