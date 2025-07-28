@@ -437,6 +437,164 @@ class EnhancedAIAnalyzer {
         return details;
     }
 
+    // 3. Color Space Analysis - Detects AI generation artifacts in color patterns
+    async analyzeColorSpace(imageData) {
+        const { width, height, data } = imageData;
+        const result = {
+            confidence: 50,
+            aiProbability: 0.5,
+            details: [],
+            artifacts: []
+        };
+
+        try {
+            // Analyze color space patterns
+            const colorAnalysis = this.analyzeColorSpacePatterns(data);
+            const colorArtifacts = this.detectAIColorArtifacts(colorAnalysis);
+            
+            result.confidence = this.calculateColorConfidence(colorArtifacts);
+            result.aiProbability = this.calculateColorAIProbability(colorArtifacts);
+            result.details = this.generateColorDetails(colorArtifacts);
+            result.artifacts = colorArtifacts;
+            
+            return result;
+        } catch (error) {
+            console.error('Color space analysis error:', error);
+            return result;
+        }
+    }
+
+    // 4. Edge Analysis - Detects AI generation artifacts in edge patterns
+    async analyzeEdgePatterns(imageData) {
+        const { width, height, data } = imageData;
+        const result = {
+            confidence: 50,
+            aiProbability: 0.5,
+            details: [],
+            artifacts: []
+        };
+
+        try {
+            const edges = this.detectEdges(data, width, height);
+            const edgePatterns = this.analyzeEdgePatterns(edges, width, height);
+            const edgeArtifacts = this.detectAIEdgeArtifacts(edgePatterns);
+            
+            result.confidence = this.calculateEdgeConfidence(edgePatterns);
+            result.aiProbability = this.calculateEdgeAIProbability(edgeArtifacts);
+            result.details = this.generateEdgeDetails(edgePatterns);
+            result.artifacts = edgeArtifacts;
+            
+            return result;
+        } catch (error) {
+            console.error('Edge analysis error:', error);
+            return result;
+        }
+    }
+
+    // 5. Texture Analysis - Detects AI generation artifacts in texture patterns
+    async analyzeTexturePatterns(imageData) {
+        const { width, height, data } = imageData;
+        const result = {
+            confidence: 50,
+            aiProbability: 0.5,
+            details: [],
+            artifacts: []
+        };
+
+        try {
+            const textures = this.analyzeTexturePatterns(data, width, height);
+            const textureArtifacts = this.detectAITextureArtifacts(textures);
+            
+            result.confidence = this.calculateTextureConfidence(textures);
+            result.aiProbability = this.calculateTextureAIProbability(textureArtifacts);
+            result.details = this.generateTextureDetails(textures);
+            result.artifacts = textureArtifacts;
+            
+            return result;
+        } catch (error) {
+            console.error('Texture analysis error:', error);
+            return result;
+        }
+    }
+
+    // 6. Metadata Analysis - Detects AI generation artifacts in file metadata
+    async analyzeMetadataPatterns(file) {
+        const result = {
+            confidence: 50,
+            aiProbability: 0.5,
+            details: [],
+            artifacts: []
+        };
+
+        try {
+            const metadata = this.analyzeFileMetadata(file);
+            const metadataPatterns = this.detectAIMetadataPatterns(metadata);
+            
+            result.confidence = this.calculateMetadataConfidence(metadataPatterns);
+            result.aiProbability = this.calculateMetadataAIProbability(metadataPatterns);
+            result.details = this.generateMetadataDetails(metadataPatterns);
+            result.artifacts = metadataPatterns;
+            
+            return result;
+        } catch (error) {
+            console.error('Metadata analysis error:', error);
+            return result;
+        }
+    }
+
+    // 7. Perceptual Hashing Analysis - Detects AI generation artifacts using perceptual hashing
+    async perceptualHashAnalysis(imageData) {
+        const { width, height, data } = imageData;
+        const result = {
+            confidence: 50,
+            aiProbability: 0.5,
+            details: [],
+            artifacts: []
+        };
+
+        try {
+            const hashes = this.generatePerceptualHashes(data, width, height);
+            const hashPatterns = this.compareWithAIPatterns(hashes);
+            
+            result.confidence = this.calculateHashConfidence(hashPatterns);
+            result.aiProbability = this.calculateHashAIProbability(hashPatterns);
+            result.details = this.generateHashDetails(hashPatterns);
+            result.artifacts = hashPatterns;
+            
+            return result;
+        } catch (error) {
+            console.error('Perceptual hash analysis error:', error);
+            return result;
+        }
+    }
+
+    // 8. Deep Learning Features Analysis - Detects AI generation artifacts using deep learning features
+    async analyzeDeepLearningFeatures(imageData) {
+        const { width, height, data } = imageData;
+        const result = {
+            confidence: 50,
+            aiProbability: 0.5,
+            details: [],
+            artifacts: []
+        };
+
+        try {
+            const features = this.extractDeepLearningFeatures(data, width, height);
+            const featurePatterns = this.analyzeFeaturePatterns(features);
+            const featureSignatures = this.detectAIFeatureSignatures(featurePatterns);
+            
+            result.confidence = this.calculateFeatureConfidence(features);
+            result.aiProbability = this.calculateFeatureAIProbability(featureSignatures);
+            result.details = this.generateFeatureDetails(features);
+            result.artifacts = featureSignatures;
+            
+            return result;
+        } catch (error) {
+            console.error('Deep learning features analysis error:', error);
+            return result;
+        }
+    }
+
     // Placeholder methods for other analyses (to be implemented)
     detectJPEGArtifacts(data, width, height) { return []; }
     analyzeCompressionPatterns(data, width, height) { return []; }
