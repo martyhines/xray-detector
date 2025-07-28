@@ -371,63 +371,63 @@ function determineImageType(features) {
     
     // Medical vs Non-Medical Classification
     
-    // 1. Color analysis - More strict
-    if (color.isGrayscale && color.grayscaleRatio > 0.9) {
+    // 1. Color analysis - More lenient
+    if (color.isGrayscale && color.grayscaleRatio > 0.7) {
         medicalScore += 0.3;
-        details.push('Strongly grayscale image (medical characteristic)');
-    } else if (color.isColor && color.colorRatio > 0.3) {
-        nonMedicalScore += 0.6; // Increased weight for color images
-        details.push('Color image (strong non-medical characteristic)');
+        details.push('Grayscale image (medical characteristic)');
+    } else if (color.isColor && color.colorRatio > 0.5) {
+        nonMedicalScore += 0.4; // Reduced weight for color images
+        details.push('Color image (non-medical characteristic)');
     }
     
-    // 2. Contrast analysis - More strict
-    if (statistics.range > 0.7) {
+    // 2. Contrast analysis - More lenient
+    if (statistics.range > 0.5) {
         medicalScore += 0.3;
-        details.push('Very high contrast (medical characteristic)');
-    } else if (statistics.range < 0.4) {
-        nonMedicalScore += 0.4;
-        details.push('Low contrast (non-medical characteristic)');
+        details.push('High contrast (medical characteristic)');
+    } else if (statistics.range < 0.2) {
+        nonMedicalScore += 0.3;
+        details.push('Very low contrast (non-medical characteristic)');
     }
     
-    // 3. Edge analysis - More strict
-    if (edges.edgeDensity > 0.05 && edges.edgeDensity < 0.25) {
+    // 3. Edge analysis - More lenient
+    if (edges.edgeDensity > 0.03 && edges.edgeDensity < 0.35) {
         medicalScore += 0.2;
         details.push('Moderate edge density (medical characteristic)');
-    } else if (edges.edgeDensity > 0.4) {
-        nonMedicalScore += 0.4;
-        details.push('High edge density (non-medical characteristic)');
+    } else if (edges.edgeDensity > 0.5) {
+        nonMedicalScore += 0.3;
+        details.push('Very high edge density (non-medical characteristic)');
     }
     
-    // 4. Medical artifacts - More strict
-    if (medical.hasMedicalArtifacts && (medical.gridLineRatio > 0.02 || medical.markerRatio > 0.02)) {
+    // 4. Medical artifacts - More lenient
+    if (medical.hasMedicalArtifacts && (medical.gridLineRatio > 0.01 || medical.markerRatio > 0.01)) {
         medicalScore += 0.4;
-        details.push('Clear medical artifacts detected (grids, markers)');
+        details.push('Medical artifacts detected (grids, markers)');
     }
     
-    // 5. Anatomical patterns - More strict
-    if (anatomical.isSymmetrical && anatomical.symmetry > 0.8) {
+    // 5. Anatomical patterns - More lenient
+    if (anatomical.isSymmetrical && anatomical.symmetry > 0.6) {
         medicalScore += 0.3;
-        details.push('Strong symmetrical patterns (anatomical characteristic)');
+        details.push('Symmetrical patterns (anatomical characteristic)');
     }
     
-    // 6. Texture analysis - More strict
-    if (texture.uniformity > 0.5 && texture.uniformity < 0.85) {
+    // 6. Texture analysis - More lenient
+    if (texture.uniformity > 0.3 && texture.uniformity < 0.9) {
         medicalScore += 0.2;
         details.push('Medical texture patterns');
-    } else if (texture.uniformity > 0.9) {
-        nonMedicalScore += 0.3;
+    } else if (texture.uniformity > 0.95) {
+        nonMedicalScore += 0.2;
         details.push('Overly uniform texture (non-medical)');
     }
     
-    // 7. Additional non-medical indicators
-    if (statistics.mean > 0.7) {
-        nonMedicalScore += 0.3;
+    // 7. Additional non-medical indicators - More lenient
+    if (statistics.mean > 0.8) {
+        nonMedicalScore += 0.2;
         details.push('Very bright overall (non-medical characteristic)');
     }
     
-    if (statistics.std < 0.1) {
+    if (statistics.std < 0.05) {
         nonMedicalScore += 0.2;
-        details.push('Low variance (non-medical characteristic)');
+        details.push('Very low variance (non-medical characteristic)');
     }
     
     // Determine primary classification
@@ -441,7 +441,7 @@ function determineImageType(features) {
         ctScore: ctScore.toFixed(3)
     });
     
-    if (medicalScore > nonMedicalScore && medicalScore > 0.7) {
+    if (medicalScore > nonMedicalScore && medicalScore > 0.4) {
         // It's a medical image, determine specific type
         if (statistics.mean < 0.4) {
             xrayScore += 0.4;
