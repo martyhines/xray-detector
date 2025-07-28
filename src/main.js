@@ -129,6 +129,11 @@ class XRayDetectorApp {
                 result.preprocessing = preprocessingStats;
             }
 
+            // Show processed image if preprocessing was applied
+            if (preprocessingStats && !this.dicomMetadata) {
+                this.showProcessedImage(processedFile);
+            }
+
             this.displayResults(result, analysisTime);
         } catch (error) {
             console.error('Analysis error:', error);
@@ -426,6 +431,12 @@ class XRayDetectorApp {
             breakdownSection.remove();
         }
         
+        // Hide processed image preview
+        const processedPreview = document.getElementById('processedPreview');
+        if (processedPreview) {
+            processedPreview.style.display = 'none';
+        }
+        
         // Reset file input
         const fileInput = document.getElementById('fileInput');
         if (fileInput) {
@@ -470,6 +481,21 @@ class XRayDetectorApp {
                 resolve(file);
             }, 'image/png');
         });
+    }
+
+    // Method to display processed image
+    showProcessedImage(processedFile) {
+        const processedPreview = document.getElementById('processedPreview');
+        const processedImage = document.getElementById('processedImage');
+        
+        if (processedPreview && processedImage) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                processedImage.src = e.target.result;
+                processedPreview.style.display = 'block';
+            };
+            reader.readAsDataURL(processedFile);
+        }
     }
 }
 
