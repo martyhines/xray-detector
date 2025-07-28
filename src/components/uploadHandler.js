@@ -18,21 +18,21 @@ class UploadHandler {
 
         // Prevent default drag behaviors
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, this.preventDefaults, false);
-            document.body.addEventListener(eventName, this.preventDefaults, false);
+            uploadArea.addEventListener(eventName, (e) => this.preventDefaults(e), false);
+            document.body.addEventListener(eventName, (e) => this.preventDefaults(e), false);
         });
 
         // Highlight drop area when item is dragged over it
         ['dragenter', 'dragover'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, this.highlight, false);
+            uploadArea.addEventListener(eventName, (e) => this.highlight(e), false);
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
-            uploadArea.addEventListener(eventName, this.unhighlight, false);
+            uploadArea.addEventListener(eventName, (e) => this.unhighlight(e), false);
         });
 
         // Handle dropped files
-        uploadArea.addEventListener('drop', this.handleDrop, false);
+        uploadArea.addEventListener('drop', (e) => this.handleDrop(e), false);
     }
 
     setupFileInput() {
