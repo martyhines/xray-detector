@@ -477,4 +477,7 @@ class EnhancedAIAnalyzer {
     calculateFeatureConfidence(features) { return 50; }
     calculateFeatureAIProbability(signatures) { return 0.5; }
     generateFeatureDetails(features) { return []; }
-} 
+}
+
+// Export for global use
+window.EnhancedAIAnalyzer = EnhancedAIAnalyzer; 

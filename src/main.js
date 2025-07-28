@@ -142,7 +142,9 @@ class XRayDetectorApp {
 
     showAnalyzingState() {
         const statusValue = document.getElementById('statusValue');
-        statusValue.innerHTML = '<span class="loading"></span> Analyzing...';
+        if (statusValue) {
+            statusValue.innerHTML = '<span class="loading"></span> Analyzing...';
+        }
         this.showResultsSection();
     }
 
@@ -225,6 +227,11 @@ class XRayDetectorApp {
 
     async runEnhancedAIAnalysis(file) {
         try {
+            // Check if EnhancedAIAnalyzer is available
+            if (typeof EnhancedAIAnalyzer === 'undefined') {
+                throw new Error('EnhancedAIAnalyzer not loaded');
+            }
+            
             const enhancedAIAnalyzer = new EnhancedAIAnalyzer();
             const results = await enhancedAIAnalyzer.analyzeImage(file);
             
@@ -316,20 +323,24 @@ class XRayDetectorApp {
         const confidenceBar = document.getElementById('confidenceBar');
         const confidenceValue = document.getElementById('confidenceValue');
         
-        confidenceBar.style.width = `${result.confidence}%`;
-        confidenceValue.textContent = `${result.confidence}%`;
+        if (confidenceBar) confidenceBar.style.width = `${result.confidence}%`;
+        if (confidenceValue) confidenceValue.textContent = `${result.confidence}%`;
 
         // Update status
         const statusValue = document.getElementById('statusValue');
-        statusValue.textContent = result.status;
-        statusValue.className = this.getStatusClass(result.confidence);
+        if (statusValue) {
+            statusValue.textContent = result.status;
+            statusValue.className = this.getStatusClass(result.confidence);
+        }
 
         // Update analysis time
         const analysisTimeElement = document.getElementById('analysisTime');
-        analysisTimeElement.textContent = `${(analysisTime / 1000).toFixed(1)}s`;
+        if (analysisTimeElement) {
+            analysisTimeElement.textContent = `${(analysisTime / 1000).toFixed(1)}s`;
+        }
 
         // Show detailed breakdown if available
-        if (result.traditional || result.tensorflow) {
+        if (result.traditional || result.tensorflow || result.enhancedAI) {
             const resultDisplay = new ResultDisplay();
             resultDisplay.showResults(result, analysisTime);
         } else {
