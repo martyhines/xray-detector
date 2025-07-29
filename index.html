@@ -20,7 +20,29 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-vis@1.5.1/dist/tfjs-vis.min.js"></script>
     
     <!-- DICOM Parser -->
-    <script src="https://cdn.jsdelivr.net/npm/dicom-parser@1.8.26/dist/dicomParser.min.js"></script>
+    <script src="https://unpkg.com/dicom-parser@1.8.26/dist/dicomParser.min.js"></script>
+    <script>
+        // Check if DICOM parser loaded successfully
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (typeof window.dicomParser === 'undefined' && typeof dicomParser === 'undefined') {
+                    console.warn('DICOM parser library failed to load. DICOM file support will be limited.');
+                    // Try alternative CDN
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/dicom-parser@1.8.26/dist/dicomParser.min.js';
+                    script.onload = function() {
+                        console.log('DICOM parser library loaded from alternative CDN');
+                    };
+                    script.onerror = function() {
+                        console.error('Failed to load DICOM parser from alternative CDN');
+                    };
+                    document.head.appendChild(script);
+                } else {
+                    console.log('DICOM parser library loaded successfully');
+                }
+            }, 1000); // Wait 1 second to ensure scripts are loaded
+        });
+    </script>
 </head>
 <body>
     <div id="app">

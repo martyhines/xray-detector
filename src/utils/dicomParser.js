@@ -6,11 +6,23 @@ class DICOMParser {
 
     async parseDICOMFile(file) {
         try {
+            // Check if dicomParser library is available
+            if (typeof window.dicomParser === 'undefined' && typeof dicomParser === 'undefined') {
+                throw new Error('DICOM parser library not loaded. Please check your internet connection and refresh the page.');
+            }
+
             // Read file as ArrayBuffer
             const arrayBuffer = await this.readFileAsArrayBuffer(file);
             
-            // Parse DICOM data
-            const dataSet = dicomParser.parseDICOM(arrayBuffer);
+            // Parse DICOM data - try different possible global variable names
+            let dataSet;
+            if (typeof window.dicomParser !== 'undefined') {
+                dataSet = window.dicomParser.parseDICOM(arrayBuffer);
+            } else if (typeof dicomParser !== 'undefined') {
+                dataSet = dicomParser.parseDICOM(arrayBuffer);
+            } else {
+                throw new Error('DICOM parser library not available');
+            }
             
             // Extract metadata
             const metadata = this.extractMetadata(dataSet);

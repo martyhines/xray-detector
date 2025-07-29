@@ -113,6 +113,13 @@ class UploadHandler {
             // Validate DICOM format
             try {
                 if (!this.dicomParser) {
+                    // Check if DICOMParser class is available
+                    if (typeof window.DICOMParser === 'undefined') {
+                        return { 
+                            valid: false, 
+                            message: 'DICOM parser not available. Please refresh the page and try again.' 
+                        };
+                    }
                     this.dicomParser = new DICOMParser();
                 }
                 const isDICOMFile = await this.dicomParser.isDICOMFile(file);
@@ -120,7 +127,11 @@ class UploadHandler {
                     return { valid: false, message: 'Invalid DICOM file format.' };
                 }
             } catch (error) {
-                return { valid: false, message: 'Error validating DICOM file.' };
+                console.error('DICOM validation error:', error);
+                return { 
+                    valid: false, 
+                    message: 'Error validating DICOM file. The DICOM parser library may not be loaded properly.' 
+                };
             }
             
             return { valid: true, isDICOM: true };
@@ -170,6 +181,10 @@ class UploadHandler {
             if (isDICOM) {
                 try {
                     if (!this.dicomParser) {
+                        // Check if DICOMParser class is available
+                        if (typeof window.DICOMParser === 'undefined') {
+                            throw new Error('DICOM parser library not loaded. Please refresh the page and try again.');
+                        }
                         this.dicomParser = new DICOMParser();
                     }
                     
@@ -193,7 +208,7 @@ class UploadHandler {
                     
                 } catch (dicomError) {
                     console.error('DICOM processing error:', dicomError);
-                    this.showError('Error processing DICOM file. Please try again.');
+                    this.showError(`Error processing DICOM file: ${dicomError.message}. Please try again or use a different image format.`);
                     this.hideLoadingState();
                     return;
                 }
