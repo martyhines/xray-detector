@@ -165,14 +165,15 @@ class XRayDetectorApp {
 
     async performAnalysis(file) {
         try {
-            // Run both traditional analysis and TensorFlow analysis
-            const [traditionalResults, tensorflowResults] = await Promise.all([
+            // Run traditional, TensorFlow, and enhanced AI analysis in parallel
+            const [traditionalResults, tensorflowResults, enhancedAIResults] = await Promise.all([
                 this.runTraditionalAnalysis(file),
-                this.runTensorFlowAnalysis(file)
+                this.runTensorFlowAnalysis(file),
+                this.runEnhancedAIAnalysis(file)
             ]);
 
             // Combine results with weighted average
-            const combinedConfidence = this.combineResults(traditionalResults, tensorflowResults);
+            const combinedConfidence = this.combineResults(traditionalResults, tensorflowResults, enhancedAIResults);
             
             return {
                 confidence: combinedConfidence.confidence,
@@ -181,7 +182,8 @@ class XRayDetectorApp {
                 timestamp: new Date().toISOString(),
                 // Include detailed results for the breakdown
                 traditional: traditionalResults,
-                tensorflow: tensorflowResults
+                tensorflow: tensorflowResults,
+                enhancedAI: enhancedAIResults
             };
         } catch (error) {
             console.error('Analysis error:', error);
@@ -238,43 +240,86 @@ class XRayDetectorApp {
         }
     }
 
-    combineResults(traditional, tensorflow) {
-        // Adjust weights based on whether TensorFlow analysis is available
-        let traditionalWeight, tensorflowWeight;
-        
-        if (tensorflow.method === 'Fallback Analysis') {
-            // If TensorFlow failed, rely more on traditional analysis
+    async runEnhancedAIAnalysis(file) {
+        try {
+            if (typeof EnhancedAIAnalyzer === 'undefined') {
+                throw new Error('EnhancedAIAnalyzer not loaded');
+            }
+            const enhancedAIAnalyzer = new EnhancedAIAnalyzer();
+            const results = await enhancedAIAnalyzer.analyzeImage(file);
+            return {
+                confidence: results.overall.confidence,
+                status: results.overall.status,
+                details: results.overall.details,
+                method: 'Enhanced AI Analysis',
+                aiProbability: results.overall.aiProbability,
+                methods: results.methods
+            };
+        } catch (error) {
+            console.warn('Enhanced AI analysis failed, using fallback:', error);
+            // Return a fallback result
+            return {
+                confidence: 50,
+                status: 'Enhanced Analysis Unavailable',
+                details: ['Enhanced AI analysis failed, using other methods'],
+                method: 'Enhanced AI Fallback',
+                aiProbability: 0.5
+            };
+        }
+    }
+
+    combineResults(traditional, tensorflow, enhancedAI) {
+        // Adjust weights based on which analyses are available
+        let traditionalWeight, tensorflowWeight, enhancedAIWeight;
+        if (tensorflow.method === 'Fallback Analysis' && enhancedAI.method === 'Enhanced AI Fallback') {
+            // If both AI methods failed, rely more on traditional analysis
             traditionalWeight = 0.8;
-            tensorflowWeight = 0.2;
-        } else {
-            // Normal weighting (TensorFlow gets higher weight as it's more sophisticated)
-            traditionalWeight = 0.3;
+            tensorflowWeight = 0.1;
+            enhancedAIWeight = 0.1;
+        } else if (tensorflow.method === 'Fallback Analysis') {
+            // If only TensorFlow failed, use enhanced AI more
+            traditionalWeight = 0.2;
+            tensorflowWeight = 0.1;
+            enhancedAIWeight = 0.7;
+        } else if (enhancedAI.method === 'Enhanced AI Fallback') {
+            // If only enhanced AI failed, use TensorFlow more
+            traditionalWeight = 0.2;
             tensorflowWeight = 0.7;
-        }
-        
-        const combinedConfidence = Math.round(
-            (traditional.confidence * traditionalWeight) + 
-            (tensorflow.confidence * tensorflowWeight)
-        );
-        
-        // Determine status based on combined confidence
-        let status, details;
-        
-        if (combinedConfidence >= 70) {
-            status = 'Likely Authentic';
-            details = 'Both traditional and AI analysis indicate authenticity';
-        } else if (combinedConfidence >= 40) {
-            status = 'Uncertain';
-            details = 'Mixed indicators detected, manual review recommended';
+            enhancedAIWeight = 0.1;
         } else {
-            status = 'Likely AI Generated';
-            details = 'Multiple detection methods indicate AI generation';
+            // All methods available - enhanced AI gets highest weight
+            traditionalWeight = 0.2;
+            tensorflowWeight = 0.3;
+            enhancedAIWeight = 0.5;
         }
-        
+        const combinedConfidence = Math.round(
+            (traditional.confidence * traditionalWeight) +
+            (tensorflow.confidence * tensorflowWeight) +
+            (enhancedAI.confidence * enhancedAIWeight)
+        );
+        // Calculate combined AI probability
+        const combinedAIProbability = (
+            (traditional.aiProbability || 0.5) * traditionalWeight +
+            (tensorflow.aiProbability || 0.5) * tensorflowWeight +
+            (enhancedAI.aiProbability || 0.5) * enhancedAIWeight
+        );
+        // Determine status based on combined confidence and AI probability
+        let status, details;
+        if (combinedAIProbability > 0.7) {
+            status = 'Likely AI Generated';
+            details = 'Multiple advanced detection methods indicate AI generation';
+        } else if (combinedAIProbability > 0.4) {
+            status = 'Suspicious - Manual Review Recommended';
+            details = 'Mixed indicators detected, enhanced analysis suggests potential AI generation';
+        } else {
+            status = 'Likely Authentic';
+            details = 'Advanced analysis indicates authentic medical image';
+        }
         return {
             confidence: combinedConfidence,
             status,
-            details: [details]
+            details: [details],
+            aiProbability: combinedAIProbability
         };
     }
 
@@ -296,7 +341,7 @@ class XRayDetectorApp {
         analysisTimeElement.textContent = `${(analysisTime / 1000).toFixed(1)}s`;
 
         // Show detailed breakdown if available
-        if (result.traditional || result.tensorflow) {
+        if (result.traditional || result.tensorflow || result.enhancedAI) {
             const resultDisplay = new ResultDisplay();
             resultDisplay.showResults(result, analysisTime);
         } else {
