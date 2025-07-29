@@ -4,8 +4,6 @@ class XRayDetectorApp {
         this.currentFile = null;
         this.isAnalyzing = false;
         this.imageTypeClassifier = null;
-        this.isInClassificationMode = false;
-        this.imagePreprocessor = null;
         this.init();
     }
 
@@ -13,8 +11,6 @@ class XRayDetectorApp {
         this.setupEventListeners();
         // Initialize the image type classifier
         this.imageTypeClassifier = new ImageTypeClassifier();
-        // Initialize the image preprocessor
-        this.imagePreprocessor = new ImagePreprocessor();
         console.log('X-Ray Detector App initialized');
     }
 
@@ -23,8 +19,8 @@ class XRayDetectorApp {
         this.uploadHandler = new UploadHandler();
         
         // Listen for file selection events from upload handler
-        this.uploadHandler.onFileSelected = (file, dicomMetadata) => {
-            this.handleFileSelect(file, dicomMetadata);
+        this.uploadHandler.onFileSelected = (file) => {
+            this.handleFileSelect(file);
         };
         
         // Listen for reset events from upload handler
@@ -33,7 +29,7 @@ class XRayDetectorApp {
         };
     }
 
-    handleFileSelect(file, dicomMetadata = null) {
+    handleFileSelect(file) {
         if (!file) return;
 
         // Validate file type
@@ -42,17 +38,13 @@ class XRayDetectorApp {
             return;
         }
 
-        // Validate file size (max 100MB for DICOM)
-        const maxSize = dicomMetadata ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
-        if (file.size > maxSize) {
-            this.showError(`File size must be less than ${dicomMetadata ? '100MB' : '10MB'}.`);
+        // Validate file size (max 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+            this.showError('File size must be less than 10MB.');
             return;
         }
 
-        // Reset any previous state
-        this.isInClassificationMode = false;
         this.currentFile = file;
-        this.dicomMetadata = dicomMetadata;
         this.displayImagePreview(file);
         this.showPreviewSection();
     }
@@ -89,65 +81,28 @@ class XRayDetectorApp {
         this.showAnalyzingState();
 
         try {
-            // Preprocess image if it's not a DICOM file
-            let processedFile = this.currentFile;
-            let preprocessingStats = null;
-            
-            if (!this.dicomMetadata) {
-                console.log('Preprocessing non-DICOM image before classification...');
-                const imageData = await this.getImageData(this.currentFile);
-                const processedImageData = await this.imagePreprocessor.preprocessImage(imageData, false);
-                processedFile = await this.imageDataToFile(processedImageData, this.currentFile.name);
-                preprocessingStats = this.imagePreprocessor.getPreprocessingStats(imageData, processedImageData);
-                console.log('Preprocessing stats:', preprocessingStats);
-            }
-
-            // TEMPORARILY DISABLED: Classify the image type (using preprocessed image if available)
-            /*
+            // First, classify the image type
             if (!this.imageTypeClassifier) {
                 this.imageTypeClassifier = new ImageTypeClassifier();
             }
-            
-            console.log('🔍 CLASSIFICATION DEBUG: Starting image classification...');
-            console.log('🔍 CLASSIFICATION DEBUG: File type:', this.currentFile.type);
-            console.log('🔍 CLASSIFICATION DEBUG: File name:', this.currentFile.name);
-            console.log('🔍 CLASSIFICATION DEBUG: Is DICOM:', !!this.dicomMetadata);
-            console.log('🔍 CLASSIFICATION DEBUG: Was preprocessed:', !!preprocessingStats);
-            
-            const classification = await this.imageTypeClassifier.classifyImage(processedFile);
-            console.log('🔍 CLASSIFICATION DEBUG: Raw classification result:', classification);
-            
+            const classification = await this.imageTypeClassifier.classifyImage(this.currentFile);
             const classificationMessage = this.imageTypeClassifier.getClassificationMessage(classification);
-            console.log('🔍 CLASSIFICATION DEBUG: Classification message:', classificationMessage);
             
             // Check if it's a medical image
             if (!classificationMessage.canProceed) {
-                this.isInClassificationMode = true;
                 this.showClassificationResult(classificationMessage);
                 return;
             }
-            */
-            
-            // TEMPORARY: Skip classification and proceed directly to analysis
-            console.log('🔍 TEMP: Classification bypassed - proceeding directly to analysis');
             
             // If it's medical, proceed with authenticity analysis
             const startTime = Date.now();
-            const result = await this.performAnalysis(processedFile);
+            const result = await this.performAnalysis(this.currentFile);
             const analysisTime = Date.now() - startTime;
 
-            // Add classification info and preprocessing stats to results
-            result.imageType = 'Medical (Classification Bypassed)';
-            result.imageTypeConfidence = 1.0;
-            result.classificationDetails = ['Classification temporarily disabled for testing'];
-            if (preprocessingStats) {
-                result.preprocessing = preprocessingStats;
-            }
-
-            // Show processed image if preprocessing was applied
-            if (preprocessingStats && !this.dicomMetadata) {
-                this.showProcessedImage(processedFile);
-            }
+            // Add classification info to results
+            result.imageType = classification.type;
+            result.imageTypeConfidence = classification.confidence;
+            result.classificationDetails = classification.details;
 
             this.displayResults(result, analysisTime);
         } catch (error) {
@@ -176,7 +131,7 @@ class XRayDetectorApp {
                     <p>${classificationMessage.message}</p>
                     ${classificationMessage.details ? `<p class="classification-details"><strong>Details:</strong> ${classificationMessage.details}</p>` : ''}
                     <div class="classification-actions">
-                        <button class="btn btn-primary" onclick="window.app.resetUpload()">
+                        <button class="btn btn-primary" onclick="resetUpload()">
                             <i class="fas fa-upload"></i> Upload Medical Image
                         </button>
                     </div>
@@ -187,23 +142,20 @@ class XRayDetectorApp {
 
     showAnalyzingState() {
         const statusValue = document.getElementById('statusValue');
-        if (statusValue) {
-            statusValue.innerHTML = '<span class="loading"></span> Analyzing...';
-        }
+        statusValue.innerHTML = '<span class="loading"></span> Analyzing...';
         this.showResultsSection();
     }
 
     async performAnalysis(file) {
         try {
-            // File is already preprocessed at this point, so run analysis directly
-            const [traditionalResults, tensorflowResults, enhancedAIResults] = await Promise.all([
+            // Run both traditional analysis and TensorFlow analysis
+            const [traditionalResults, tensorflowResults] = await Promise.all([
                 this.runTraditionalAnalysis(file),
-                this.runTensorFlowAnalysis(file),
-                this.runEnhancedAIAnalysis(file)
+                this.runTensorFlowAnalysis(file)
             ]);
 
             // Combine results with weighted average
-            const combinedConfidence = this.combineResults(traditionalResults, tensorflowResults, enhancedAIResults);
+            const combinedConfidence = this.combineResults(traditionalResults, tensorflowResults);
             
             return {
                 confidence: combinedConfidence.confidence,
@@ -212,8 +164,7 @@ class XRayDetectorApp {
                 timestamp: new Date().toISOString(),
                 // Include detailed results for the breakdown
                 traditional: traditionalResults,
-                tensorflow: tensorflowResults,
-                enhancedAI: enhancedAIResults
+                tensorflow: tensorflowResults
             };
         } catch (error) {
             console.error('Analysis error:', error);
@@ -270,96 +221,43 @@ class XRayDetectorApp {
         }
     }
 
-    async runEnhancedAIAnalysis(file) {
-        try {
-            // Check if EnhancedAIAnalyzer is available
-            if (typeof EnhancedAIAnalyzer === 'undefined') {
-                throw new Error('EnhancedAIAnalyzer not loaded');
-            }
-            
-            const enhancedAIAnalyzer = new EnhancedAIAnalyzer();
-            const results = await enhancedAIAnalyzer.analyzeImage(file);
-            
-            return {
-                confidence: results.overall.confidence,
-                status: results.overall.status,
-                details: results.overall.details,
-                method: 'Enhanced AI Analysis',
-                aiProbability: results.overall.aiProbability,
-                methods: results.methods
-            };
-        } catch (error) {
-            console.warn('Enhanced AI analysis failed, using fallback:', error);
-            
-            // Return a fallback result
-            return {
-                confidence: 50,
-                status: 'Enhanced Analysis Unavailable',
-                details: ['Enhanced AI analysis failed, using other methods'],
-                method: 'Enhanced AI Fallback',
-                aiProbability: 0.5
-            };
-        }
-    }
-
-    combineResults(traditional, tensorflow, enhancedAI) {
-        // Adjust weights based on which analyses are available
-        let traditionalWeight, tensorflowWeight, enhancedAIWeight;
+    combineResults(traditional, tensorflow) {
+        // Adjust weights based on whether TensorFlow analysis is available
+        let traditionalWeight, tensorflowWeight;
         
-        if (tensorflow.method === 'Fallback Analysis' && enhancedAI.method === 'Enhanced AI Fallback') {
-            // If both AI methods failed, rely more on traditional analysis
+        if (tensorflow.method === 'Fallback Analysis') {
+            // If TensorFlow failed, rely more on traditional analysis
             traditionalWeight = 0.8;
-            tensorflowWeight = 0.1;
-            enhancedAIWeight = 0.1;
-        } else if (tensorflow.method === 'Fallback Analysis') {
-            // If only TensorFlow failed, use enhanced AI more
-            traditionalWeight = 0.2;
-            tensorflowWeight = 0.1;
-            enhancedAIWeight = 0.7;
-        } else if (enhancedAI.method === 'Enhanced AI Fallback') {
-            // If only enhanced AI failed, use TensorFlow more
-            traditionalWeight = 0.2;
-            tensorflowWeight = 0.7;
-            enhancedAIWeight = 0.1;
+            tensorflowWeight = 0.2;
         } else {
-            // All methods available - enhanced AI gets highest weight
-            traditionalWeight = 0.2;
-            tensorflowWeight = 0.3;
-            enhancedAIWeight = 0.5;
+            // Normal weighting (TensorFlow gets higher weight as it's more sophisticated)
+            traditionalWeight = 0.3;
+            tensorflowWeight = 0.7;
         }
         
         const combinedConfidence = Math.round(
             (traditional.confidence * traditionalWeight) + 
-            (tensorflow.confidence * tensorflowWeight) +
-            (enhancedAI.confidence * enhancedAIWeight)
+            (tensorflow.confidence * tensorflowWeight)
         );
         
-        // Calculate combined AI probability
-        const combinedAIProbability = (
-            (traditional.aiProbability || 0.5) * traditionalWeight +
-            (tensorflow.aiProbability || 0.5) * tensorflowWeight +
-            (enhancedAI.aiProbability || 0.5) * enhancedAIWeight
-        );
-        
-        // Determine status based on combined confidence and AI probability
+        // Determine status based on combined confidence
         let status, details;
         
-        if (combinedAIProbability > 0.7) {
-            status = 'Likely AI Generated';
-            details = 'Multiple advanced detection methods indicate AI generation';
-        } else if (combinedAIProbability > 0.4) {
-            status = 'Suspicious - Manual Review Recommended';
-            details = 'Mixed indicators detected, enhanced analysis suggests potential AI generation';
-        } else {
+        if (combinedConfidence >= 70) {
             status = 'Likely Authentic';
-            details = 'Advanced analysis indicates authentic medical image';
+            details = 'Both traditional and AI analysis indicate authenticity';
+        } else if (combinedConfidence >= 40) {
+            status = 'Uncertain';
+            details = 'Mixed indicators detected, manual review recommended';
+        } else {
+            status = 'Likely AI Generated';
+            details = 'Multiple detection methods indicate AI generation';
         }
         
         return {
             confidence: combinedConfidence,
             status,
-            details: [details],
-            aiProbability: combinedAIProbability
+            details: [details]
         };
     }
 
@@ -368,24 +266,20 @@ class XRayDetectorApp {
         const confidenceBar = document.getElementById('confidenceBar');
         const confidenceValue = document.getElementById('confidenceValue');
         
-        if (confidenceBar) confidenceBar.style.width = `${result.confidence}%`;
-        if (confidenceValue) confidenceValue.textContent = `${result.confidence}%`;
+        confidenceBar.style.width = `${result.confidence}%`;
+        confidenceValue.textContent = `${result.confidence}%`;
 
         // Update status
         const statusValue = document.getElementById('statusValue');
-        if (statusValue) {
-            statusValue.textContent = result.status;
-            statusValue.className = this.getStatusClass(result.confidence);
-        }
+        statusValue.textContent = result.status;
+        statusValue.className = this.getStatusClass(result.confidence);
 
         // Update analysis time
         const analysisTimeElement = document.getElementById('analysisTime');
-        if (analysisTimeElement) {
-            analysisTimeElement.textContent = `${(analysisTime / 1000).toFixed(1)}s`;
-        }
+        analysisTimeElement.textContent = `${(analysisTime / 1000).toFixed(1)}s`;
 
         // Show detailed breakdown if available
-        if (result.traditional || result.tensorflow || result.enhancedAI) {
+        if (result.traditional || result.tensorflow) {
             const resultDisplay = new ResultDisplay();
             resultDisplay.showResults(result, analysisTime);
         } else {
@@ -406,8 +300,6 @@ class XRayDetectorApp {
 
     resetUpload() {
         this.currentFile = null;
-        this.isAnalyzing = false;
-        this.isInClassificationMode = false;
         
         // Clear preview image
         const previewImage = document.getElementById('previewImage');
@@ -446,71 +338,7 @@ class XRayDetectorApp {
             breakdownSection.remove();
         }
         
-        // Hide processed image preview
-        const processedPreview = document.getElementById('processedPreview');
-        if (processedPreview) {
-            processedPreview.style.display = 'none';
-        }
-        
-        // Reset file input
-        const fileInput = document.getElementById('fileInput');
-        if (fileInput) {
-            fileInput.value = '';
-        }
-        
         this.showUploadSection();
-    }
-
-    // Helper method to convert file to ImageData
-    async getImageData(file) {
-        return new Promise((resolve) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const img = new Image();
-            
-            img.onload = () => {
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                resolve(imageData);
-            };
-            
-            img.src = URL.createObjectURL(file);
-        });
-    }
-
-    // Helper method to convert ImageData back to File
-    async imageDataToFile(imageData, originalFileName) {
-        return new Promise((resolve) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = imageData.width;
-            canvas.height = imageData.height;
-            ctx.putImageData(imageData, 0, 0);
-            
-            canvas.toBlob((blob) => {
-                const fileName = originalFileName.replace(/\.[^/.]+$/, '_processed.png');
-                const file = new File([blob], fileName, { type: 'image/png' });
-                resolve(file);
-            }, 'image/png');
-        });
-    }
-
-    // Method to display processed image
-    showProcessedImage(processedFile) {
-        const processedPreview = document.getElementById('processedPreview');
-        const processedImage = document.getElementById('processedImage');
-        
-        if (processedPreview && processedImage) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                processedImage.src = e.target.result;
-                processedPreview.style.display = 'block';
-            };
-            reader.readAsDataURL(processedFile);
-        }
     }
 }
 
@@ -522,8 +350,8 @@ function analyzeImage() {
 }
 
 function resetUpload() {
-    if (window.app) {
-        window.app.resetUpload();
+    if (window.app && window.app.uploadHandler) {
+        window.app.uploadHandler.resetUpload();
     }
 }
 

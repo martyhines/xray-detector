@@ -1,7 +1,7 @@
 // Enhanced Image Preprocessor for Medical Images
 class ImagePreprocessor {
     constructor() {
-        this.targetSize = 512;
+        this.targetSize = 256;
         this.textDetectionThreshold = 0.8;
         this.overlayDetectionThreshold = 0.7;
     }
@@ -29,7 +29,7 @@ class ImagePreprocessor {
 
             // Step 4: Resize to standard dimensions
             const resizedData = this.resizeToStandard(normalizedData);
-            console.log('✓ Resized to 512x512');
+            console.log('✓ Resized to 256x256');
 
             return resizedData;
         } catch (error) {
