@@ -220,7 +220,7 @@ class UploadHandler {
 
             // Notify main app about file selection
             if (this.onFileSelected) {
-                this.onFileSelected(processedFile, dicomMetadata);
+                this.onFileSelected(processedFile, dicomMetadata, isDICOM);
             }
 
             // Hide loading state
