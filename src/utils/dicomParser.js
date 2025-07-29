@@ -17,9 +17,9 @@ class DICOMParser {
             // Parse DICOM data - try different possible global variable names
             let dataSet;
             if (typeof window.dicomParser !== 'undefined') {
-                dataSet = window.dicomParser.parseDICOM(arrayBuffer);
+                dataSet = window.dicomParser.parseDicom(arrayBuffer);
             } else if (typeof dicomParser !== 'undefined') {
-                dataSet = dicomParser.parseDICOM(arrayBuffer);
+                dataSet = dicomParser.parseDicom(arrayBuffer);
             } else {
                 throw new Error('DICOM parser library not available');
             }
