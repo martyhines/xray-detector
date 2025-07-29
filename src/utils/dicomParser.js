@@ -13,13 +13,19 @@ class DICOMParser {
 
             // Read file as ArrayBuffer
             const arrayBuffer = await this.readFileAsArrayBuffer(file);
+            let byteArray = arrayBuffer;
+            // Ensure byteArray is a Uint8Array
+            if (!(byteArray instanceof Uint8Array)) {
+                byteArray = new Uint8Array(arrayBuffer);
+            }
+            console.log('Type of byteArray:', byteArray.constructor.name, byteArray);
             
             // Parse DICOM data - try different possible global variable names
             let dataSet;
             if (typeof window.dicomParser !== 'undefined') {
-                dataSet = window.dicomParser.parseDicom(arrayBuffer);
+                dataSet = window.dicomParser.parseDicom(byteArray);
             } else if (typeof dicomParser !== 'undefined') {
-                dataSet = dicomParser.parseDicom(arrayBuffer);
+                dataSet = dicomParser.parseDicom(byteArray);
             } else {
                 throw new Error('DICOM parser library not available');
             }
@@ -219,27 +225,36 @@ class DICOMParser {
         const maxValue = Math.pow(2, bitsStored) - 1;
         const minValue = isSigned ? -Math.pow(2, bitsStored - 1) : 0;
 
-        for (let i = 0; i < pixelData.length; i++) {
-            let pixelValue;
-            
-            if (bitsAllocated === 16) {
-                pixelValue = isSigned ? 
-                    new Int16Array(pixelData.buffer, pixelData.byteOffset + i * 2, 1)[0] :
-                    new Uint16Array(pixelData.buffer, pixelData.byteOffset + i * 2, 1)[0];
-            } else {
-                pixelValue = pixelData[i];
+        if (bitsAllocated === 16) {
+            // Create the view once
+            const view = isSigned
+                ? new Int16Array(pixelData.buffer, pixelData.byteOffset, pixelData.length / 2)
+                : new Uint16Array(pixelData.buffer, pixelData.byteOffset, pixelData.length / 2);
+            for (let i = 0; i < view.length; i++) {
+                let pixelValue = view[i];
+                // Normalize to 0-255
+                const normalizedValue = Math.max(0, Math.min(255,
+                    ((pixelValue - minValue) / (maxValue - minValue)) * 255
+                ));
+                const pixelIndex = i * 4;
+                imageData[pixelIndex] = normalizedValue;     // Red
+                imageData[pixelIndex + 1] = normalizedValue; // Green
+                imageData[pixelIndex + 2] = normalizedValue; // Blue
+                imageData[pixelIndex + 3] = 255;             // Alpha
             }
-
-            // Normalize to 0-255
-            const normalizedValue = Math.max(0, Math.min(255, 
-                ((pixelValue - minValue) / (maxValue - minValue)) * 255
-            ));
-
-            const pixelIndex = i * 4;
-            imageData[pixelIndex] = normalizedValue;     // Red
-            imageData[pixelIndex + 1] = normalizedValue; // Green
-            imageData[pixelIndex + 2] = normalizedValue; // Blue
-            imageData[pixelIndex + 3] = 255;             // Alpha
+        } else {
+            for (let i = 0; i < pixelData.length; i++) {
+                let pixelValue = pixelData[i];
+                // Normalize to 0-255
+                const normalizedValue = Math.max(0, Math.min(255,
+                    ((pixelValue - minValue) / (maxValue - minValue)) * 255
+                ));
+                const pixelIndex = i * 4;
+                imageData[pixelIndex] = normalizedValue;     // Red
+                imageData[pixelIndex + 1] = normalizedValue; // Green
+                imageData[pixelIndex + 2] = normalizedValue; // Blue
+                imageData[pixelIndex + 3] = 255;             // Alpha
+            }
         }
     }
 
