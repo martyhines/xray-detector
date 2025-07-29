@@ -23,7 +23,7 @@ class TensorFlowAnalyzer {
 
         try {
             // Create Web Worker
-            this.worker = new Worker('./src/workers/analysisWorker.js');
+            this.worker = new Worker('/src/workers/analysisWorker.js');
             
             // Set up message handlers
             this.worker.onmessage = (e) => {
