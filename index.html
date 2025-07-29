@@ -174,14 +174,16 @@
                 <div class="info-section">
                     <div class="info-card">
                         <h3><i class="fas fa-info-circle"></i> How It Works</h3>
-                        <p>Our advanced AI analyzes medical images (X-rays, MRIs, and CT scans) for signs of manipulation, AI generation, or doctoring. The system examines various factors including:</p>
+                        <p>Our system analyzes medical images (X-rays, MRIs, and CT scans) for signs of manipulation, AI generation, or doctoring using three parallel analysis pipelines:</p>
                         <ul>
-                            <li>AI-powered deep learning analysis</li>
-                            <li>Image type detection (X-ray vs MRI vs CT)</li>
+                            <li><strong>Traditional Analysis:</strong> Examines metadata, compression, noise, and statistical patterns</li>
+                            <li><strong>AI-Powered Deep Learning Analysis:</strong> Uses TensorFlow-based models to detect authenticity and AI fingerprints</li>
+                            <li><strong>Enhanced AI Analysis:</strong> Combines advanced frequency, noise, edge, texture, color, statistical, and deep learning feature analysis for robust AI detection</li>
+                        </ul>
+                        <p>Results from all three pipelines are combined for a comprehensive authenticity confidence score. The system also examines:</p>
+                        <ul>
                             <li>MRI-specific analysis (slice thickness, artifacts, contrast)</li>
                             <li>CT-specific analysis (Hounsfield units, beam hardening, metal artifacts)</li>
-                            <li>Image metadata and compression artifacts</li>
-                            <li>Statistical patterns and noise analysis</li>
                             <li>Anatomical consistency and medical plausibility</li>
                             <li>AI generation fingerprints and artifacts</li>
                         </ul>
