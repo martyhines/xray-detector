@@ -90,35 +90,37 @@ async function loadModel() {
     }
 }
 
-// Preprocess image
-async function preprocessImage(imageData) {
+// Preprocess image for TensorFlow analysis
+// For DICOM files, skip resizing/normalization and just convert to tensor
+async function preprocessImage(imageData, isDICOM = false) {
     sendProgress('Preprocessing image...');
-    
     return new Promise((resolve) => {
-        const canvas = new OffscreenCanvas(imageData.width, imageData.height);
-        const ctx = canvas.getContext('2d');
-        
-        // Draw image data to canvas
-        ctx.putImageData(imageData, 0, 0);
-        
-        // Convert to tensor
-        const tensor = tf.browser.fromPixels(canvas, 3);
-        
-        // Resize to 224x224
-        const resized = tf.image.resizeBilinear(tensor, [224, 224]);
-        
-        // Normalize pixel values to [0, 1]
-        const normalized = resized.div(255.0);
-        
-        // Add batch dimension
-        const batched = normalized.expandDims(0);
-        
-        // Clean up intermediate tensors
-        tensor.dispose();
-        resized.dispose();
-        normalized.dispose();
-        
-        resolve(batched);
+        if (isDICOM) {
+            // DICOM images are already preprocessed and in correct format
+            // Just convert to tensor without resizing/normalization
+            // This preserves medical pixel values and avoids data loss
+            const canvas = new OffscreenCanvas(imageData.width, imageData.height);
+            const ctx = canvas.getContext('2d');
+            ctx.putImageData(imageData, 0, 0);
+            const tensor = tf.browser.fromPixels(canvas, 3);
+            // Add batch dimension only
+            const batched = tensor.expandDims(0);
+            tensor.dispose();
+            resolve(batched);
+        } else {
+            // Standard preprocessing for non-DICOM images
+            const canvas = new OffscreenCanvas(imageData.width, imageData.height);
+            const ctx = canvas.getContext('2d');
+            ctx.putImageData(imageData, 0, 0);
+            const tensor = tf.browser.fromPixels(canvas, 3);
+            const resized = tf.image.resizeBilinear(tensor, [224, 224]);
+            const normalized = resized.div(255.0);
+            const batched = normalized.expandDims(0);
+            tensor.dispose();
+            resized.dispose();
+            normalized.dispose();
+            resolve(batched);
+        }
     });
 }
 
@@ -439,10 +441,10 @@ self.onmessage = async function(e) {
                 
             case 'analyze':
                 sendProgress('Starting image analysis...');
-                const { imageData } = data;
+                const { imageData, isDICOM } = data;
                 
-                // Preprocess image
-                const tensor = await preprocessImage(imageData);
+                // Preprocess image (skip for DICOM)
+                const tensor = await preprocessImage(imageData, isDICOM);
                 
                 // Run full analysis
                 const results = await runFullAnalysis(tensor);

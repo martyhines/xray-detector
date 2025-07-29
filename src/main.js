@@ -84,51 +84,55 @@ class XRayDetectorApp {
         try {
             let result, analysisTime;
             if (this.isDICOM) {
-                // Skip classification for DICOM files
-                const startTime = Date.now();
-                result = await this.performAnalysis(this.currentFile);
-                analysisTime = Date.now() - startTime;
-                result.imageType = 'DICOM';
-                result.imageTypeConfidence = 1.0;
-                result.classificationDetails = 'DICOM file detected; classification skipped.';
+                this.currentFile.isDICOM = true;
             } else {
-                // TEMPORARILY DISABLED: Classify the image type
-                /*
-                if (!this.imageTypeClassifier) {
-                    this.imageTypeClassifier = new ImageTypeClassifier();
-                }
-                const classification = await this.imageTypeClassifier.classifyImage(this.currentFile);
-                const classificationMessage = this.imageTypeClassifier.getClassificationMessage(classification);
-                // Check if it's a medical image
-                if (!classificationMessage.canProceed) {
-                    this.showClassificationResult(classificationMessage);
-                    return;
-                }
-                // If it's medical, proceed with authenticity analysis
-                const startTime = Date.now();
-                result = await this.performAnalysis(this.currentFile);
-                analysisTime = Date.now() - startTime;
-                // Add classification info to results
-                result.imageType = classification.type;
-                result.imageTypeConfidence = classification.confidence;
-                result.classificationDetails = classification.details;
-                */
-                // TEMPORARY: Skip classification and proceed directly to analysis
-                const startTime = Date.now();
-                result = await this.performAnalysis(this.currentFile);
-                analysisTime = Date.now() - startTime;
-                result.imageType = 'Medical (Classification Bypassed)';
-                result.imageTypeConfidence = 1.0;
-                result.classificationDetails = 'Classification temporarily disabled for testing';
+                this.currentFile.isDICOM = false;
             }
-            this.displayResults(result, analysisTime);
-        } catch (error) {
-            console.error('Analysis error:', error);
-            this.showError('Analysis failed. Please try again.');
-        } finally {
-            this.isAnalyzing = false;
+            // Skip classification for DICOM files
+            const startTime = Date.now();
+            result = await this.performAnalysis(this.currentFile);
+            analysisTime = Date.now() - startTime;
+            result.imageType = 'DICOM';
+            result.imageTypeConfidence = 1.0;
+            result.classificationDetails = 'DICOM file detected; classification skipped.';
+        } else {
+            // TEMPORARILY DISABLED: Classify the image type
+            /*
+            if (!this.imageTypeClassifier) {
+                this.imageTypeClassifier = new ImageTypeClassifier();
+            }
+            const classification = await this.imageTypeClassifier.classifyImage(this.currentFile);
+            const classificationMessage = this.imageTypeClassifier.getClassificationMessage(classification);
+            // Check if it's a medical image
+            if (!classificationMessage.canProceed) {
+                this.showClassificationResult(classificationMessage);
+                return;
+            }
+            // If it's medical, proceed with authenticity analysis
+            const startTime = Date.now();
+            result = await this.performAnalysis(this.currentFile);
+            analysisTime = Date.now() - startTime;
+            // Add classification info to results
+            result.imageType = classification.type;
+            result.imageTypeConfidence = classification.confidence;
+            result.classificationDetails = classification.details;
+            */
+            // TEMPORARY: Skip classification and proceed directly to analysis
+            const startTime = Date.now();
+            result = await this.performAnalysis(this.currentFile);
+            analysisTime = Date.now() - startTime;
+            result.imageType = 'Medical (Classification Bypassed)';
+            result.imageTypeConfidence = 1.0;
+            result.classificationDetails = 'Classification temporarily disabled for testing';
         }
+        this.displayResults(result, analysisTime);
+    } catch (error) {
+        console.error('Analysis error:', error);
+        this.showError('Analysis failed. Please try again.');
+    } finally {
+        this.isAnalyzing = false;
     }
+}
 
     showClassificationResult(classificationMessage) {
         const resultsSection = document.getElementById('resultsSection');

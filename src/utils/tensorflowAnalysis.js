@@ -114,7 +114,7 @@ class TensorFlowAnalyzer {
                 // Send analysis request
                 this.worker.postMessage({
                     type: 'analyze',
-                    data: { imageData }
+                    data: { imageData, isDICOM: file.isDICOM || false }
                 });
             });
             
