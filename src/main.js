@@ -19,8 +19,8 @@ class XRayDetectorApp {
         this.uploadHandler = new UploadHandler();
         
         // Listen for file selection events from upload handler
-        this.uploadHandler.onFileSelected = (file) => {
-            this.handleFileSelect(file);
+        this.uploadHandler.onFileSelected = (file, dicomMetadata, isDICOM) => {
+            this.handleFileSelect(file, dicomMetadata, isDICOM);
         };
         
         // Listen for reset events from upload handler
@@ -29,7 +29,7 @@ class XRayDetectorApp {
         };
     }
 
-    handleFileSelect(file) {
+    handleFileSelect(file, dicomMetadata, isDICOM = false) {
         if (!file) return;
 
         // Validate file type
@@ -45,6 +45,7 @@ class XRayDetectorApp {
         }
 
         this.currentFile = file;
+        this.isDICOM = isDICOM;
         this.displayImagePreview(file);
         this.showPreviewSection();
     }
@@ -81,29 +82,45 @@ class XRayDetectorApp {
         this.showAnalyzingState();
 
         try {
-            // First, classify the image type
-            if (!this.imageTypeClassifier) {
-                this.imageTypeClassifier = new ImageTypeClassifier();
+            let result, analysisTime;
+            if (this.isDICOM) {
+                // Skip classification for DICOM files
+                const startTime = Date.now();
+                result = await this.performAnalysis(this.currentFile);
+                analysisTime = Date.now() - startTime;
+                result.imageType = 'DICOM';
+                result.imageTypeConfidence = 1.0;
+                result.classificationDetails = 'DICOM file detected; classification skipped.';
+            } else {
+                // TEMPORARILY DISABLED: Classify the image type
+                /*
+                if (!this.imageTypeClassifier) {
+                    this.imageTypeClassifier = new ImageTypeClassifier();
+                }
+                const classification = await this.imageTypeClassifier.classifyImage(this.currentFile);
+                const classificationMessage = this.imageTypeClassifier.getClassificationMessage(classification);
+                // Check if it's a medical image
+                if (!classificationMessage.canProceed) {
+                    this.showClassificationResult(classificationMessage);
+                    return;
+                }
+                // If it's medical, proceed with authenticity analysis
+                const startTime = Date.now();
+                result = await this.performAnalysis(this.currentFile);
+                analysisTime = Date.now() - startTime;
+                // Add classification info to results
+                result.imageType = classification.type;
+                result.imageTypeConfidence = classification.confidence;
+                result.classificationDetails = classification.details;
+                */
+                // TEMPORARY: Skip classification and proceed directly to analysis
+                const startTime = Date.now();
+                result = await this.performAnalysis(this.currentFile);
+                analysisTime = Date.now() - startTime;
+                result.imageType = 'Medical (Classification Bypassed)';
+                result.imageTypeConfidence = 1.0;
+                result.classificationDetails = 'Classification temporarily disabled for testing';
             }
-            const classification = await this.imageTypeClassifier.classifyImage(this.currentFile);
-            const classificationMessage = this.imageTypeClassifier.getClassificationMessage(classification);
-            
-            // Check if it's a medical image
-            if (!classificationMessage.canProceed) {
-                this.showClassificationResult(classificationMessage);
-                return;
-            }
-            
-            // If it's medical, proceed with authenticity analysis
-            const startTime = Date.now();
-            const result = await this.performAnalysis(this.currentFile);
-            const analysisTime = Date.now() - startTime;
-
-            // Add classification info to results
-            result.imageType = classification.type;
-            result.imageTypeConfidence = classification.confidence;
-            result.classificationDetails = classification.details;
-
             this.displayResults(result, analysisTime);
         } catch (error) {
             console.error('Analysis error:', error);
