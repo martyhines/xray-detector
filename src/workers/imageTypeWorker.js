@@ -23,6 +23,18 @@ const CONFIG = {
     MEDICAL_SCORE_MIN: 0.4,
 };
 
+// Allow toggling DEBUG via query param (?debug=1 or true)
+try {
+    const qs = (self && self.location && self.location.search) ? self.location.search : '';
+    if (qs) {
+        const params = new URLSearchParams(qs);
+        const dbg = params.get('debug');
+        if (dbg === '1' || dbg === 'true') CONFIG.DEBUG = true;
+    }
+} catch (e) {
+    // noop
+}
+
 function logDebug(...args) {
     if (CONFIG.DEBUG) {
         // eslint-disable-next-line no-console
@@ -103,8 +115,8 @@ function computeStatsAndColor(data, sampleRate = CONFIG.COLOR_SAMPLE_RATE) {
     const variance = count > 1 ? M2 / count : 0;
     const std = Math.sqrt(variance);
     const range = max - min;
-
-    return {
+        
+        return {
         statistics: { mean, std, variance, range, max, min },
         color: {
             grayscaleRatio: count ? grayscalePixels / count : 0,
@@ -143,7 +155,7 @@ function analyzeEdgesFast(imageInfo) {
         }
     }
 
-    return {
+        return {
         edgeDensity: totalSamples ? edgeCount / totalSamples : 0,
         strongEdgeRatio: totalSamples ? strongEdges / totalSamples : 0,
         totalEdges: edgeCount,
@@ -235,10 +247,10 @@ function extractClassificationFeatures(imageInfo) {
 
         // Medical-specific features (kept as-is for now)
         const medicalFeatures = analyzeMedicalFeatures(imageInfo);
-
+        
         // Anatomical pattern analysis (kept as-is)
         const anatomicalFeatures = analyzeAnatomicalPatterns(imageInfo);
-
+        
         return {
             statistics: statsColor.statistics,
             color: statsColor.color,
