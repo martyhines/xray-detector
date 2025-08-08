@@ -1882,6 +1882,34 @@ class ImageAnalyzer {
             return 'X-Ray';
         }
     }
+
+    async basicAnalyze(file) {
+        const img = await this.createImageElement(file);
+        const [metadata, noise, compression, statistical, frequency, mriDetection, mriAnalysis, ctDetection, ctAnalysis] = await Promise.all([
+            this.analyzeMetadata(file),
+            this.analyzeNoisePatterns(img),
+            this.analyzeCompressionArtifacts(img),
+            this.analyzeStatisticalPatterns(img),
+            this.analyzeFrequencyDomain(img),
+            this.detectMRI(img),
+            this.analyzeMRISpecific(img),
+            this.detectCT(img),
+            this.analyzeCTSpecific(img)
+        ]);
+        const results = {
+            metadata,
+            noise,
+            compression,
+            statistical,
+            frequency,
+            mriDetection,
+            mriAnalysis,
+            ctDetection,
+            ctAnalysis
+        };
+        results.overall = this.calculateOverallScore(results);
+        return results;
+    }
 }
 
 // Export for use in other modules
