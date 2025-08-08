@@ -22,8 +22,12 @@ class TensorFlowAnalyzer {
         this.updateModelStatus('Initializing analysis worker...');
 
         try {
-            // Create Web Worker
-            this.worker = new Worker('/src/workers/analysisWorker.js');
+            // Create Web Worker with robust path for local and GitHub Pages
+            const basePath = window.location.origin + (window.location.pathname.endsWith('/')
+                ? window.location.pathname
+                : window.location.pathname.replace(/[^\/]*$/, ''));
+            const workerPath = new URL('src/workers/analysisWorker.js', basePath).toString();
+            this.worker = new Worker(workerPath);
             
             // Set up message handlers
             this.worker.onmessage = (e) => {
