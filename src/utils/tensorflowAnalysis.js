@@ -4,7 +4,10 @@ class TensorFlowAnalyzer {
         this.worker = null;
         this.isWorkerReady = false;
         this.workerLoading = false;
-        this.init();
+        // Only initialize if explicitly enabled
+        if (window.AppConfig?.FEATURES?.ENABLE_TENSORFLOW) {
+            this.init();
+        }
     }
 
     async init() {
@@ -17,6 +20,7 @@ class TensorFlowAnalyzer {
 
     async initWorker() {
         if (this.workerLoading || this.isWorkerReady) return;
+        if (!window.AppConfig?.FEATURES?.ENABLE_TENSORFLOW) return; // do not init when disabled
         
         this.workerLoading = true;
         this.updateModelStatus('Initializing analysis worker...');
@@ -70,13 +74,12 @@ class TensorFlowAnalyzer {
 
 
     async analyzeImage(file) {
-        // If backend deep forensics is disabled, skip this module entirely
-        if (!window.AppConfig?.FEATURES?.ENABLE_BACKEND) {
-            // Short-circuit to fallback to avoid confusing timeouts
+        // If TensorFlow analysis is disabled, skip this module entirely
+        if (!window.AppConfig?.FEATURES?.ENABLE_TENSORFLOW) {
             return {
                 confidence: 50,
                 status: 'Analysis Unavailable',
-                details: ['Deep AI analysis disabled'],
+                details: ['TensorFlow analysis disabled'],
                 method: 'Fallback Analysis',
                 aiProbability: 0.5
             };

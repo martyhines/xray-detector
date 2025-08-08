@@ -218,6 +218,15 @@ class XRayDetectorApp {
 
     async runTensorFlowAnalysis(file) {
         try {
+            if (!window.AppConfig?.FEATURES?.ENABLE_TENSORFLOW) {
+                return {
+                    confidence: 50,
+                    status: 'Analysis Unavailable',
+                    details: ['TensorFlow analysis disabled'],
+                    method: 'Fallback Analysis',
+                    aiProbability: 0.5
+                };
+            }
             const tensorflowAnalyzer = new TensorFlowAnalyzer();
             const results = await tensorflowAnalyzer.analyzeImage(file);
             
