@@ -1820,8 +1820,8 @@ class ImageAnalyzer {
     }
 
     calculateOverallScore(results) {
-        // Weighted average of all analysis results
-        const weights = {
+        // Weighted average of all analysis results using config weights
+        const w = (window.AppConfig && window.AppConfig.WEIGHTS && window.AppConfig.WEIGHTS.CLASSICAL) || {
             metadata: 0.08,
             noise: 0.15,
             compression: 0.12,
@@ -1832,19 +1832,15 @@ class ImageAnalyzer {
             ctDetection: 0.08,
             ctAnalysis: 0.08
         };
-        
         let totalScore = 0;
         let totalWeight = 0;
-        
-        for (const [key, weight] of Object.entries(weights)) {
+        for (const [key, weight] of Object.entries(w)) {
             if (results[key] && typeof results[key].confidence === 'number') {
                 totalScore += results[key].confidence * weight;
                 totalWeight += weight;
             }
         }
-        
         const overallConfidence = totalWeight > 0 ? totalScore / totalWeight : 50;
-        
         return {
             confidence: Math.round(overallConfidence),
             status: this.getStatusFromConfidence(overallConfidence),
