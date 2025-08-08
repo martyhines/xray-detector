@@ -45,9 +45,28 @@ class ImageAnalyzer {
     }
 
     async runClassicalForensics(file) {
-        // TODO: implement: PRNU/FPN residuals, enhanced ELA, frequency ratios, series checks (for DICOM)
-        // For now, re-use existing methods, return structured
+        const metaStart = Date.now();
         const base = await this.basicAnalyze(file);
+        const forensic = { methods: [], features: {}, startedAt: metaStart };
+        try {
+            const [ela, freq, noise] = await Promise.all([
+                window.Forensics.computeELAFeatures(file),
+                window.Forensics.computeFrequencyFeatures(file),
+                window.Forensics.computeNoiseResidualFeatures(file)
+            ]);
+            forensic.methods.push(ela, freq, noise);
+            forensic.features.ela = ela.features;
+            forensic.features.frequency = freq.features;
+            forensic.features.noiseResidual = noise.features;
+        } catch (e) {
+            forensic.methods.push({ method: 'Forensics', score: 50, details: ['Forensics failed'] });
+        }
+        // Convert suspicious scores to authenticity contribution: authenticity = 100 - suspicious
+        const suspicious = forensic.methods.reduce((s, m) => s + (m.score || 50), 0) / Math.max(1, forensic.methods.length);
+        const authenticity = Math.round(100 - suspicious);
+        base.overall = base.overall || { confidence: authenticity, status: authenticity >= 70 ? 'Likely Authentic' : authenticity >= 40 ? 'Uncertain' : 'Likely AI Generated', details: [] };
+        base.overall.details = [...(base.overall.details || []), ...forensic.methods.flatMap(m => m.details || [])];
+        base.forensics = forensic;
         return base;
     }
 
