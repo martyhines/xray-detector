@@ -225,58 +225,94 @@ class DICOMParser {
         const maxValue = Math.pow(2, bitsStored) - 1;
         const minValue = isSigned ? -Math.pow(2, bitsStored - 1) : 0;
 
+        // Default rescale
+        let rescaleSlope = 1.0;
+        let rescaleIntercept = 0.0;
+        try {
+            // If available later in applyWindowLevel, keep defaults here
+        } catch (_) {}
+
+        // Convert function to write a normalized 0..255 grayscale into RGBA target
+        const writeGray = (idx, gray) => {
+            const g = Math.max(0, Math.min(255, gray));
+            imageData[idx] = g;
+            imageData[idx + 1] = g;
+            imageData[idx + 2] = g;
+            imageData[idx + 3] = 255;
+        };
+
         if (bitsAllocated === 16) {
-            // Create the view once
             const view = isSigned
                 ? new Int16Array(pixelData.buffer, pixelData.byteOffset, pixelData.length / 2)
                 : new Uint16Array(pixelData.buffer, pixelData.byteOffset, pixelData.length / 2);
             for (let i = 0; i < view.length; i++) {
-                let pixelValue = view[i];
-                // Normalize to 0-255
-                const normalizedValue = Math.max(0, Math.min(255,
-                    ((pixelValue - minValue) / (maxValue - minValue)) * 255
-                ));
+                let pv = view[i];
+                // Normalize raw to 0..1 in stored range
+                const norm = (pv - minValue) / (maxValue - minValue);
+                const gray = Math.round(norm * 255);
                 const pixelIndex = i * 4;
-                imageData[pixelIndex] = normalizedValue;     // Red
-                imageData[pixelIndex + 1] = normalizedValue; // Green
-                imageData[pixelIndex + 2] = normalizedValue; // Blue
-                imageData[pixelIndex + 3] = 255;             // Alpha
+                writeGray(pixelIndex, gray);
             }
         } else {
             for (let i = 0; i < pixelData.length; i++) {
-                let pixelValue = pixelData[i];
-                // Normalize to 0-255
-                const normalizedValue = Math.max(0, Math.min(255,
-                    ((pixelValue - minValue) / (maxValue - minValue)) * 255
-                ));
+                let pv = pixelData[i];
+                const norm = (pv - minValue) / (maxValue - minValue);
+                const gray = Math.round(norm * 255);
                 const pixelIndex = i * 4;
-                imageData[pixelIndex] = normalizedValue;     // Red
-                imageData[pixelIndex + 1] = normalizedValue; // Green
-                imageData[pixelIndex + 2] = normalizedValue; // Blue
-                imageData[pixelIndex + 3] = 255;             // Alpha
+                writeGray(pixelIndex, gray);
+            }
+        }
+
+        // Handle MONOCHROME1 inversion (bright is low)
+        if (photometricInterpretation && photometricInterpretation.toUpperCase() === 'MONOCHROME1') {
+            for (let i = 0; i < imageData.length; i += 4) {
+                const g = imageData[i];
+                const inv = 255 - g;
+                imageData[i] = inv;
+                imageData[i + 1] = inv;
+                imageData[i + 2] = inv;
             }
         }
     }
 
     applyWindowLevel(imageData, dataSet) {
         try {
-            const windowCenter = dataSet.float('x00281050');
-            const windowWidth = dataSet.float('x00281051');
-            
-            if (windowCenter && windowWidth) {
-                const min = windowCenter - windowWidth / 2;
-                const max = windowCenter + windowWidth / 2;
-                const range = max - min;
-
-                for (let i = 0; i < imageData.data.length; i += 4) {
-                    const value = imageData.data[i];
-                    const normalized = Math.max(0, Math.min(255, 
-                        ((value - min) / range) * 255
-                    ));
-                    imageData.data[i] = normalized;
-                    imageData.data[i + 1] = normalized;
-                    imageData.data[i + 2] = normalized;
+            // Window Center/Width can be multi-valued; fetch as strings then parse first
+            let wc = dataSet.string('x00281050');
+            let ww = dataSet.string('x00281051');
+            if (!wc || !ww) {
+                // Fallback to float if string not available
+                const fwc = dataSet.float('x00281050');
+                const fww = dataSet.float('x00281051');
+                if (typeof fwc === 'number' && typeof fww === 'number') {
+                    wc = String(fwc);
+                    ww = String(fww);
                 }
+            }
+            if (!wc || !ww) return;
+
+            // If multi-valued, take first
+            const parseFirst = (v) => {
+                if (typeof v !== 'string') return Number(v);
+                const parts = v.split('\\');
+                return Number(parts[0]);
+            };
+            const windowCenter = parseFirst(wc);
+            const windowWidth = parseFirst(ww);
+            if (!isFinite(windowCenter) || !isFinite(windowWidth) || windowWidth <= 0) return;
+
+            const min = windowCenter - windowWidth / 2;
+            const max = windowCenter + windowWidth / 2;
+            const range = max - min;
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const v = data[i];
+                const norm = Math.max(0, Math.min(1, (v - min) / range));
+                const g = Math.round(norm * 255);
+                data[i] = g;
+                data[i + 1] = g;
+                data[i + 2] = g;
             }
         } catch (error) {
             console.warn('Error applying window/level:', error);

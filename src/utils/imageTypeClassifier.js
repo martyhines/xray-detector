@@ -24,8 +24,12 @@ class ImageTypeClassifier {
 
         try {
             console.log('Initializing image type worker...');
-            // Create Web Worker
-            this.worker = new Worker('./src/workers/imageTypeWorker.js');
+            // Create Web Worker with robust path for local and GitHub Pages
+            const basePath = window.location.origin + (window.location.pathname.endsWith('/')
+                ? window.location.pathname
+                : window.location.pathname.replace(/[^\/]*$/, ''));
+            const workerPath = new URL('src/workers/imageTypeWorker.js', basePath).toString();
+            this.worker = new Worker(workerPath);
             
             // Set up message handlers
             this.worker.onmessage = (e) => {
