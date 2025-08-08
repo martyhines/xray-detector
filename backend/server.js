@@ -16,6 +16,10 @@ function simpleDeepForensicsPlaceholder(buffer) {
   return { confidence, status: confidence >= 70 ? 'Likely Authentic' : confidence >= 40 ? 'Uncertain' : 'Likely AI Generated', details };
 }
 
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
+});
+
 app.post('/analyze', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'no file' });

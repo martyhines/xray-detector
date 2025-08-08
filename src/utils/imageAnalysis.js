@@ -71,13 +71,28 @@ class ImageAnalyzer {
     }
 
     async runBackendForensics(file) {
-        const url = window.AppConfig.BACKEND_URL + '/analyze';
-        const blob = file; // already a File
-        const form = new FormData();
-        form.append('image', blob, blob.name);
-        const resp = await fetch(url, { method: 'POST', body: form });
-        if (!resp.ok) throw new Error('backend error');
-        return await resp.json();
+        const controller = new AbortController();
+        const timeoutMs = 15000;
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            // Warmup health ping (non-blocking, ignore failures)
+            try {
+                fetch(window.AppConfig.BACKEND_URL + '/health', { method: 'GET', cache: 'no-store' }).catch(() => {});
+            } catch {}
+            const url = window.AppConfig.BACKEND_URL + '/analyze';
+            const form = new FormData();
+            form.append('image', file, file.name);
+            const resp = await fetch(url, { method: 'POST', body: form, signal: controller.signal });
+            if (!resp.ok) throw new Error('backend error');
+            return await resp.json();
+        } catch (e) {
+            if (e.name === 'AbortError') {
+                return { confidence: 50, status: 'Backend timeout', details: ['Backend did not respond within 15s'] };
+            }
+            throw e;
+        } finally {
+            clearTimeout(timeout);
+        }
     }
 
     combine(classical, backend) {
