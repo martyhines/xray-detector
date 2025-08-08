@@ -77,7 +77,7 @@ class TensorFlowAnalyzer {
 
         // Wait for worker to be ready
         let attempts = 0;
-        while (!this.isWorkerReady && attempts < 20) {
+        while (!this.isWorkerReady && attempts < 40) { // doubled attempts
             await new Promise(resolve => setTimeout(resolve, 250));
             attempts++;
         }
@@ -96,7 +96,7 @@ class TensorFlowAnalyzer {
             return new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     reject(new Error('Analysis timeout'));
-                }, 30000); // 30 second timeout
+                }, 60000); // 60 second timeout
                 
                 // Set up one-time result handler
                 const resultHandler = (e) => {
@@ -106,6 +106,9 @@ class TensorFlowAnalyzer {
                         clearTimeout(timeout);
                         this.worker.removeEventListener('message', resultHandler);
                         resolve(this.interpretResults(results));
+                    } else if (type === 'progress') {
+                        // propagate progress to UI
+                        this.updateModelStatus(results ? results.message || 'Working...' : 'Working...');
                     } else if (type === 'error') {
                         clearTimeout(timeout);
                         this.worker.removeEventListener('message', resultHandler);
@@ -118,7 +121,7 @@ class TensorFlowAnalyzer {
                 // Send analysis request
                 this.worker.postMessage({
                     type: 'analyze',
-                    data: { imageData, isDICOM: file.isDICOM || false }
+                    data: { imageData }
                 });
             });
             

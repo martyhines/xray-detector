@@ -2,7 +2,12 @@
 // Handles all complex computations in background thread
 
 // Import TensorFlow.js in worker context
-importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js');
+try {
+  importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js');
+} catch (e) {
+  // eslint-disable-next-line no-console
+  console.error('Failed to import TensorFlow.js in worker:', e);
+}
 
 let model = null;
 let isModelLoaded = false;
@@ -10,10 +15,20 @@ let isModelLoaded = false;
 // Initialize TensorFlow.js in worker
 async function initTensorFlow() {
     try {
-        await tf.ready();
-        console.log('TensorFlow.js ready in worker');
-        return true;
+        if (typeof tf !== 'undefined') {
+            // Prefer WebGL backend if available
+            try { await tf.setBackend('webgl'); } catch (_) {}
+            await tf.ready();
+            // eslint-disable-next-line no-console
+            console.log('TensorFlow.js ready in worker (backend:', tf.getBackend(), ')');
+            return true;
+        } else {
+            // eslint-disable-next-line no-console
+            console.error('TensorFlow.js is not available in worker context');
+            return false;
+        }
     } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Failed to initialize TensorFlow in worker:', error);
         return false;
     }
@@ -22,50 +37,18 @@ async function initTensorFlow() {
 // Create the CNN model
 function createModel() {
     const model = tf.sequential();
-    
     // Input layer - expect 224x224x3 RGB images
-    model.add(tf.layers.conv2d({
-        inputShape: [224, 224, 3],
-        filters: 32,
-        kernelSize: 3,
-        activation: 'relu',
-        padding: 'same'
-    }));
+    model.add(tf.layers.conv2d({ inputShape: [224, 224, 3], filters: 32, kernelSize: 3, activation: 'relu', padding: 'same' }));
     model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
-    
-    // Second convolutional layer
-    model.add(tf.layers.conv2d({
-        filters: 64,
-        kernelSize: 3,
-        activation: 'relu',
-        padding: 'same'
-    }));
+    model.add(tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'relu', padding: 'same' }));
     model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
-    
-    // Third convolutional layer
-    model.add(tf.layers.conv2d({
-        filters: 128,
-        kernelSize: 3,
-        activation: 'relu',
-        padding: 'same'
-    }));
+    model.add(tf.layers.conv2d({ filters: 128, kernelSize: 3, activation: 'relu', padding: 'same' }));
     model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
-    
-    // Flatten and dense layers
     model.add(tf.layers.flatten());
     model.add(tf.layers.dense({ units: 256, activation: 'relu' }));
     model.add(tf.layers.dropout({ rate: 0.5 }));
-    
-    // Output layer - binary classification
     model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
-
-    // Compile the model
-    model.compile({
-        optimizer: 'adam',
-        loss: 'binaryCrossentropy',
-        metrics: ['accuracy']
-    });
-
+    model.compile({ optimizer: 'adam', loss: 'binaryCrossentropy', metrics: ['accuracy'] });
     return model;
 }
 
