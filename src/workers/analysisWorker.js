@@ -4,6 +4,7 @@
 // Import TensorFlow.js in worker context
 try {
   importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js');
+  importScripts('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.15.0/dist/tf-backend-wasm.min.js');
 } catch (e) {
   // eslint-disable-next-line no-console
   console.error('Failed to import TensorFlow.js in worker:', e);
@@ -15,20 +16,24 @@ let isModelLoaded = false;
 // Initialize TensorFlow.js in worker
 async function initTensorFlow() {
     try {
-        if (typeof tf !== 'undefined') {
-            // Prefer WebGL backend if available
-            try { await tf.setBackend('webgl'); } catch (_) {}
-            await tf.ready();
-            // eslint-disable-next-line no-console
-            console.log('TensorFlow.js ready in worker (backend:', tf.getBackend(), ')');
-            return true;
-        } else {
-            // eslint-disable-next-line no-console
+        if (typeof tf === 'undefined') {
             console.error('TensorFlow.js is not available in worker context');
             return false;
         }
+        // Prefer WASM in worker for broad compatibility
+        try {
+            if (tf?.wasm?.setWasmPaths) {
+                tf.wasm.setWasmPaths('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.15.0/dist/');
+            }
+            await tf.setBackend('wasm');
+        } catch (_) {
+            // Fallback to CPU
+            try { await tf.setBackend('cpu'); } catch (_) {}
+        }
+        await tf.ready();
+        console.log('TensorFlow.js ready in worker (backend:', tf.getBackend(), ')');
+        return true;
     } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('Failed to initialize TensorFlow in worker:', error);
         return false;
     }
@@ -37,7 +42,6 @@ async function initTensorFlow() {
 // Create the CNN model
 function createModel() {
     const model = tf.sequential();
-    // Input layer - expect 224x224x3 RGB images
     model.add(tf.layers.conv2d({ inputShape: [224, 224, 3], filters: 32, kernelSize: 3, activation: 'relu', padding: 'same' }));
     model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
     model.add(tf.layers.conv2d({ filters: 64, kernelSize: 3, activation: 'relu', padding: 'same' }));
@@ -57,15 +61,12 @@ async function loadModel() {
     try {
         sendProgress('Loading AI model...');
         model = createModel();
-        
-        // Warm up the model
-        const dummyTensor = tf.zeros([1, 224, 224, 3]);
-        const prediction = model.predict(dummyTensor);
-        prediction.dispose();
-        dummyTensor.dispose();
-        
+        // Warm up
+        const dummy = tf.zeros([1, 224, 224, 3]);
+        model.predict(dummy).dispose();
+        dummy.dispose();
         isModelLoaded = true;
-        sendProgress('AI model ready');
+        sendProgress(`AI model ready (backend: ${tf.getBackend()})`);
         return true;
     } catch (error) {
         console.error('Failed to load model in worker:', error);
@@ -398,11 +399,7 @@ function seededRandom(seed) {
 
 // Send progress updates to main thread
 function sendProgress(message) {
-    self.postMessage({
-        type: 'progress',
-        message: message,
-        timestamp: Date.now()
-    });
+    self.postMessage({ type: 'progress', message, timestamp: Date.now() });
 }
 
 // Main message handler
