@@ -1,141 +1,254 @@
 // Web Worker for Medical Image Type Classification
 // Determines if an image is medical (X-ray, MRI, CT) or non-medical
 
+// =========================
+// Configuration & Utilities
+// =========================
+const CONFIG = {
+    DEBUG: false,
+    // Downsampling target to cap work while keeping enough detail
+    DOWNSAMPLE: { width: 256, height: 256 },
+    // Sampling rates
+    COLOR_SAMPLE_RATE: 4,      // every Nth pixel for color/stats
+    EDGE_STEP: 8,              // step in pixels for edge sampling
+    TEXTURE_STEP: 16,          // step in pixels for texture sampling
+    // Thresholds
+    COLOR_DIFF_THRESHOLD: 0.1, // grayscale (R≈G≈B)
+    EDGE_GRAD_THRESHOLD: 0.1,  // gradient magnitude (normalized 0..1)
+    EDGE_STRONG_THRESHOLD: 0.3,
+    TEXTURE_UNIFORM_TRANSITIONS_MAX: 1,
+    MEDICAL_GRID_THRESHOLD: 0.01,
+    MEDICAL_MARKER_THRESHOLD: 0.01,
+    // Decision thresholds
+    MEDICAL_SCORE_MIN: 0.4,
+};
+
+function logDebug(...args) {
+    if (CONFIG.DEBUG) {
+        // eslint-disable-next-line no-console
+        console.log('[ImageTypeWorker]', ...args);
+    }
+}
+
+// =========================
+// Worker Init
+// =========================
 // Initialize worker
 async function initWorker() {
     try {
-        console.log('Image type classifier worker ready');
+        logDebug('Image type classifier worker ready');
         return true;
     } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Failed to initialize image type worker:', error);
         return false;
     }
 }
 
-// Preprocess image for classification
+// =========================
+// Preprocess: downsample for consistent work budget
+// =========================
 async function preprocessImage(imageData) {
     return new Promise((resolve) => {
-        // Create a simple data structure for analysis
-        const imageInfo = {
-            width: imageData.width,
-            height: imageData.height,
-            data: imageData.data,
-            totalPixels: imageData.width * imageData.height
-        };
-        resolve(imageInfo);
+        // Downsample using OffscreenCanvas for consistent feature extraction cost
+        const srcCanvas = new OffscreenCanvas(imageData.width, imageData.height);
+        const srcCtx = srcCanvas.getContext('2d');
+        srcCtx.putImageData(imageData, 0, 0);
+
+        const dstCanvas = new OffscreenCanvas(CONFIG.DOWNSAMPLE.width, CONFIG.DOWNSAMPLE.height);
+        const dstCtx = dstCanvas.getContext('2d');
+        // High quality scaling
+        dstCtx.imageSmoothingEnabled = true;
+        dstCtx.imageSmoothingQuality = 'high';
+        dstCtx.drawImage(srcCanvas, 0, 0, CONFIG.DOWNSAMPLE.width, CONFIG.DOWNSAMPLE.height);
+
+        const downsampled = dstCtx.getImageData(0, 0, CONFIG.DOWNSAMPLE.width, CONFIG.DOWNSAMPLE.height);
+        resolve({
+            width: downsampled.width,
+            height: downsampled.height,
+            data: downsampled.data,
+            totalPixels: downsampled.width * downsampled.height,
+        });
     });
 }
 
-// Classify image type using comprehensive analysis
-async function classifyImageType(imageInfo) {
-    try {
-        console.log('🔍 WORKER DEBUG: Starting image type classification...');
-        console.log('🔍 WORKER DEBUG: Image dimensions:', imageInfo.width, 'x', imageInfo.height);
-        console.log('🔍 WORKER DEBUG: Total pixels:', imageInfo.totalPixels);
-        
-        // Extract comprehensive features for classification
-        console.log('🔍 WORKER DEBUG: Extracting classification features...');
-        const features = extractClassificationFeatures(imageInfo);
-        console.log('🔍 WORKER DEBUG: Extracted features:', features);
-        
-        // Determine image type based on features
-        console.log('🔍 WORKER DEBUG: Determining image type...');
-        const classification = determineImageType(features);
-        console.log('🔍 WORKER DEBUG: Final classification:', classification);
-        
-        return {
-            type: classification.type,
-            confidence: classification.confidence,
-            details: classification.details,
-            features: features
-        };
-    } catch (error) {
-        console.error('🔍 WORKER DEBUG: Classification error:', error);
-        // Return a safe default classification
-        return {
-            type: 'Non-Medical',
-            confidence: 0.6,
-            details: ['Unable to perform detailed analysis - defaulting to non-medical'],
-            features: {}
-        };
+// =========================
+// Optimized Feature Helpers
+// =========================
+function computeStatsAndColor(data, sampleRate = CONFIG.COLOR_SAMPLE_RATE) {
+    let count = 0;
+    let mean = 0, M2 = 0; // Welford online variance
+    let min = Infinity, max = -Infinity;
+    let grayscalePixels = 0, colorPixels = 0;
+
+    for (let i = 0; i + 2 < data.length; i += sampleRate * 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        // Luma (BT.709)
+        const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+        count++;
+        const delta = luma - mean;
+        mean += delta / count;
+        M2 += delta * (luma - mean);
+
+        if (luma < min) min = luma;
+        if (luma > max) max = luma;
+
+        const colorDiff = (Math.abs(r - g) + Math.abs(g - b) + Math.abs(r - b)) / 255;
+        if (colorDiff < CONFIG.COLOR_DIFF_THRESHOLD) grayscalePixels++; else colorPixels++;
     }
+
+    const variance = count > 1 ? M2 / count : 0;
+    const std = Math.sqrt(variance);
+    const range = max - min;
+
+    return {
+        statistics: { mean, std, variance, range, max, min },
+        color: {
+            grayscaleRatio: count ? grayscalePixels / count : 0,
+            colorRatio: count ? colorPixels / count : 0,
+            isGrayscale: count ? (grayscalePixels / count > 0.8) : false,
+            isColor: count ? (colorPixels / count > 0.2) : false,
+        }
+    };
 }
 
-// Extract features for image type classification
+function analyzeEdgesFast(imageInfo) {
+    const { width, height, data } = imageInfo;
+    let edgeCount = 0;
+    let strongEdges = 0;
+    let totalSamples = 0;
+
+    // Simple gradient on luma (no kernel allocs)
+    const step = CONFIG.EDGE_STEP;
+    for (let y = step; y < height - step; y += step) {
+        for (let x = step; x < width - step; x += step) {
+            const idx = (y * width + x) * 4;
+            if (idx + 6 >= data.length) continue;
+            const center = (data[idx] + data[idx + 1] + data[idx + 2]) / (3 * 255);
+            const rightIdx = idx + 4;
+            const bottomIdx = ((y + 1) * width + x) * 4;
+            if (bottomIdx + 2 >= data.length) continue;
+            const right = (data[rightIdx] + data[rightIdx + 1] + data[rightIdx + 2]) / (3 * 255);
+            const bottom = (data[bottomIdx] + data[bottomIdx + 1] + data[bottomIdx + 2]) / (3 * 255);
+
+            const grad = Math.abs(center - right) + Math.abs(center - bottom);
+            if (grad > CONFIG.EDGE_GRAD_THRESHOLD) {
+                edgeCount++;
+                if (grad > CONFIG.EDGE_STRONG_THRESHOLD) strongEdges++;
+            }
+            totalSamples++;
+        }
+    }
+
+    return {
+        edgeDensity: totalSamples ? edgeCount / totalSamples : 0,
+        strongEdgeRatio: totalSamples ? strongEdges / totalSamples : 0,
+        totalEdges: edgeCount,
+        totalSamples: totalSamples
+    };
+}
+
+function analyzeTextureFast(imageInfo) {
+    const { width, height, data } = imageInfo;
+    let uniformPatterns = 0;
+    let totalPatterns = 0;
+
+    const step = CONFIG.TEXTURE_STEP;
+    for (let y = 1; y < height - 1; y += step) {
+        for (let x = 1; x < width - 1; x += step) {
+            const idx = (y * width + x) * 4;
+            if (idx + 3 >= data.length) continue;
+            const center = (data[idx] + data[idx + 1] + data[idx + 2]) / (3 * 255);
+
+            let transitions = 0;
+            let prevBit = null;
+            let validNeighbors = 0;
+
+            // top
+            const topIdx = ((y - 1) * width + x) * 4;
+            if (topIdx >= 0 && topIdx + 3 < data.length) {
+                const top = (data[topIdx] + data[topIdx + 1] + data[topIdx + 2]) / (3 * 255);
+                const bit = top > center;
+                prevBit = bit;
+                validNeighbors++;
+            }
+            // bottom
+            const bottomIdx = ((y + 1) * width + x) * 4;
+            if (bottomIdx + 3 < data.length) {
+                const bottom = (data[bottomIdx] + data[bottomIdx + 1] + data[bottomIdx + 2]) / (3 * 255);
+                const bit = bottom > center;
+                if (prevBit !== null && bit !== prevBit) transitions++;
+                prevBit = bit;
+                validNeighbors++;
+            }
+            // left
+            const leftIdx = (y * width + (x - 1)) * 4;
+            if (leftIdx >= 0 && leftIdx + 3 < data.length) {
+                const left = (data[leftIdx] + data[leftIdx + 1] + data[leftIdx + 2]) / (3 * 255);
+                const bit = left > center;
+                if (prevBit !== null && bit !== prevBit) transitions++;
+                prevBit = bit;
+                validNeighbors++;
+            }
+            // right
+            const rightIdx = (y * width + (x + 1)) * 4;
+            if (rightIdx + 3 < data.length) {
+                const right = (data[rightIdx] + data[rightIdx + 1] + data[rightIdx + 2]) / (3 * 255);
+                const bit = right > center;
+                if (prevBit !== null && bit !== prevBit) transitions++;
+                validNeighbors++;
+            }
+
+            if (validNeighbors >= 3) {
+                if (transitions <= CONFIG.TEXTURE_UNIFORM_TRANSITIONS_MAX) uniformPatterns++;
+                totalPatterns++;
+            }
+        }
+    }
+
+    return {
+        uniformity: totalPatterns > 0 ? uniformPatterns / totalPatterns : 0.5,
+        uniformPatterns,
+        totalPatterns
+    };
+}
+
+// =========================
+// Existing Feature Methods (kept), now call optimized helpers
+// =========================
 function extractClassificationFeatures(imageInfo) {
     try {
         const { width, height, data, totalPixels } = imageInfo;
-        
-        console.log('🔍 FEATURE DEBUG: Extracting features from image...');
-        console.log('🔍 FEATURE DEBUG: Sample rate: 4 (every 4th pixel)');
-        
-        // Sample pixels for analysis (every 4th pixel for performance)
-        const sampleRate = 4;
-        let grayscalePixels = 0;
-        let colorPixels = 0;
-        let totalSamples = 0;
-        let pixelValues = [];
-        
-        for (let i = 0; i < data.length; i += sampleRate * 4) {
-            if (i + 3 < data.length) {
-                const r = data[i] / 255;
-                const g = data[i + 1] / 255;
-                const b = data[i + 2] / 255;
-                
-                // Check if pixel is grayscale (R ≈ G ≈ B)
-                const colorDiff = Math.abs(r - g) + Math.abs(g - b) + Math.abs(r - b);
-                if (colorDiff < 0.1) {
-                    grayscalePixels++;
-                } else {
-                    colorPixels++;
-                }
-                
-                pixelValues.push((r + g + b) / 3);
-                totalSamples++;
-            }
-        }
-        
-        // Calculate statistics with safety checks
-        if (pixelValues.length === 0) {
-            throw new Error('No valid pixels found for analysis');
-        }
-        
-        const mean = pixelValues.reduce((sum, val) => sum + val, 0) / pixelValues.length;
-        const variance = pixelValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / pixelValues.length;
-        const std = Math.sqrt(variance);
-        const min = Math.min(...pixelValues);
-        const max = Math.max(...pixelValues);
-        const range = max - min;
-        
-        console.log('🔍 FEATURE DEBUG: Color analysis - grayscale pixels:', grayscalePixels, 'color pixels:', colorPixels, 'total samples:', totalSamples);
-        console.log('🔍 FEATURE DEBUG: Statistics - mean:', mean.toFixed(3), 'std:', std.toFixed(3), 'min:', min.toFixed(3), 'max:', max.toFixed(3), 'range:', range.toFixed(3));
-        
-        // Edge analysis
-        const edgeFeatures = analyzeEdges(imageInfo);
-        
-        // Texture analysis
-        const textureFeatures = analyzeTexture(imageInfo);
-        
-        // Medical-specific features
+        logDebug('Extracting features from image...', { width, height, totalPixels });
+
+        // Stats & Color
+        const statsColor = computeStatsAndColor(data, CONFIG.COLOR_SAMPLE_RATE);
+
+        // Edges
+        const edgeFeatures = analyzeEdgesFast(imageInfo);
+
+        // Texture
+        const textureFeatures = analyzeTextureFast(imageInfo);
+
+        // Medical-specific features (kept as-is for now)
         const medicalFeatures = analyzeMedicalFeatures(imageInfo);
-        
-        // Anatomical pattern analysis
+
+        // Anatomical pattern analysis (kept as-is)
         const anatomicalFeatures = analyzeAnatomicalPatterns(imageInfo);
-        
+
         return {
-            statistics: { mean, std, variance, range, max, min },
-            color: {
-                grayscaleRatio: grayscalePixels / totalSamples,
-                colorRatio: colorPixels / totalSamples,
-                isGrayscale: grayscalePixels / totalSamples > 0.8,
-                isColor: colorPixels / totalSamples > 0.2
-            },
+            statistics: statsColor.statistics,
+            color: statsColor.color,
             edges: edgeFeatures,
             texture: textureFeatures,
             medical: medicalFeatures,
             anatomical: anatomicalFeatures
         };
     } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Feature extraction error:', error);
         // Return safe defaults
         return {
@@ -152,135 +265,6 @@ function extractClassificationFeatures(imageInfo) {
             anatomical: { symmetry: 0.5, symmetrySamples: 1, isSymmetrical: false }
         };
     }
-}
-
-// Analyze edge patterns
-function analyzeEdges(imageInfo) {
-    const { width, height, data } = imageInfo;
-    let edgeCount = 0;
-    let strongEdges = 0;
-    let totalSamples = 0;
-    
-    // Sample edges for analysis
-    for (let y = 1; y < height - 1; y += 8) {
-        for (let x = 1; x < width - 1; x += 8) {
-            const idx = (y * width + x) * 4;
-            if (idx + 3 < data.length) {
-                const center = (data[idx] + data[idx + 1] + data[idx + 2]) / (3 * 255);
-                const right = (data[idx + 4] + data[idx + 5] + data[idx + 6]) / (3 * 255);
-                const bottom = (data[(y + 1) * width * 4 + x * 4] + data[(y + 1) * width * 4 + x * 4 + 1] + data[(y + 1) * width * 4 + x * 4 + 2]) / (3 * 255);
-                
-                const gradient = Math.abs(center - right) + Math.abs(center - bottom);
-                
-                if (gradient > 0.1) {
-                    edgeCount++;
-                    if (gradient > 0.3) {
-                        strongEdges++;
-                    }
-                }
-                totalSamples++;
-            }
-        }
-    }
-    
-    return {
-        edgeDensity: edgeCount / totalSamples,
-        strongEdgeRatio: strongEdges / totalSamples,
-        totalEdges: edgeCount,
-        totalSamples: totalSamples
-    };
-}
-
-// Analyze texture patterns
-function analyzeTexture(imageInfo) {
-    const { width, height, data } = imageInfo;
-    let uniformPatterns = 0;
-    let totalPatterns = 0;
-    
-    try {
-        // Sample texture patterns with bounds checking
-        for (let y = 1; y < height - 1; y += 16) { // Increased step size for performance
-            for (let x = 1; x < width - 1; x += 16) {
-                const idx = (y * width + x) * 4;
-                
-                // Bounds checking
-                if (idx + 3 >= data.length) continue;
-                
-                const center = (data[idx] + data[idx + 1] + data[idx + 2]) / (3 * 255);
-                
-                // Check 4 neighbors with bounds checking
-                let transitions = 0;
-                let prevBit = null;
-                let validNeighbors = 0;
-                
-                // Top neighbor
-                const topIdx = ((y - 1) * width + x) * 4;
-                if (topIdx >= 0 && topIdx + 3 < data.length) {
-                    const topPixel = (data[topIdx] + data[topIdx + 1] + data[topIdx + 2]) / (3 * 255);
-                    const bit = topPixel > center;
-                    prevBit = bit;
-                    validNeighbors++;
-                }
-                
-                // Bottom neighbor
-                const bottomIdx = ((y + 1) * width + x) * 4;
-                if (bottomIdx + 3 < data.length) {
-                    const bottomPixel = (data[bottomIdx] + data[bottomIdx + 1] + data[bottomIdx + 2]) / (3 * 255);
-                    const bit = bottomPixel > center;
-                    if (prevBit !== null && bit !== prevBit) {
-                        transitions++;
-                    }
-                    prevBit = bit;
-                    validNeighbors++;
-                }
-                
-                // Left neighbor
-                const leftIdx = (y * width + (x - 1)) * 4;
-                if (leftIdx >= 0 && leftIdx + 3 < data.length) {
-                    const leftPixel = (data[leftIdx] + data[leftIdx + 1] + data[leftIdx + 2]) / (3 * 255);
-                    const bit = leftPixel > center;
-                    if (prevBit !== null && bit !== prevBit) {
-                        transitions++;
-                    }
-                    prevBit = bit;
-                    validNeighbors++;
-                }
-                
-                // Right neighbor
-                const rightIdx = (y * width + (x + 1)) * 4;
-                if (rightIdx + 3 < data.length) {
-                    const rightPixel = (data[rightIdx] + data[rightIdx + 1] + data[rightIdx + 2]) / (3 * 255);
-                    const bit = rightPixel > center;
-                    if (prevBit !== null && bit !== prevBit) {
-                        transitions++;
-                    }
-                    validNeighbors++;
-                }
-                
-                // Only count if we have enough valid neighbors
-                if (validNeighbors >= 3) {
-                    if (transitions <= 1) {
-                        uniformPatterns++;
-                    }
-                    totalPatterns++;
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Texture analysis error:', error);
-        // Return safe defaults
-        return {
-            uniformity: 0.5,
-            uniformPatterns: 0,
-            totalPatterns: 1
-        };
-    }
-    
-    return {
-        uniformity: totalPatterns > 0 ? uniformPatterns / totalPatterns : 0.5,
-        uniformPatterns: uniformPatterns,
-        totalPatterns: totalPatterns
-    };
 }
 
 // Analyze medical-specific features
@@ -310,9 +294,9 @@ function analyzeMedicalFeatures(imageInfo) {
     }
     
     return {
-        gridLineRatio: gridLines / totalSamples,
-        markerRatio: markers / totalSamples,
-        hasMedicalArtifacts: (gridLines / totalSamples) > 0.01 || (markers / totalSamples) > 0.01
+        gridLineRatio: totalSamples ? gridLines / totalSamples : 0,
+        markerRatio: totalSamples ? markers / totalSamples : 0,
+        hasMedicalArtifacts: totalSamples ? (gridLines / totalSamples) > CONFIG.MEDICAL_GRID_THRESHOLD || (markers / totalSamples) > CONFIG.MEDICAL_MARKER_THRESHOLD : false
     };
 }
 
@@ -341,9 +325,9 @@ function analyzeAnatomicalPatterns(imageInfo) {
     }
     
     return {
-        symmetry: symmetryScore / symmetrySamples,
+        symmetry: symmetrySamples ? symmetryScore / symmetrySamples : 0,
         symmetrySamples: symmetrySamples,
-        isSymmetrical: (symmetryScore / symmetrySamples) > 0.7
+        isSymmetrical: symmetrySamples ? (symmetryScore / symmetrySamples) > 0.7 : false
     };
 }
 
@@ -360,7 +344,7 @@ function determineImageType(features) {
     const details = [];
     
     // Debug logging
-    console.log('Classification features:', {
+    logDebug('Classification features:', {
         color: color,
         statistics: statistics,
         edges: edges,
@@ -399,7 +383,7 @@ function determineImageType(features) {
     }
     
     // 4. Medical artifacts - More lenient
-    if (medical.hasMedicalArtifacts && (medical.gridLineRatio > 0.01 || medical.markerRatio > 0.01)) {
+    if (medical.hasMedicalArtifacts && (medical.gridLineRatio > CONFIG.MEDICAL_GRID_THRESHOLD || medical.markerRatio > CONFIG.MEDICAL_MARKER_THRESHOLD)) {
         medicalScore += 0.4;
         details.push('Medical artifacts detected (grids, markers)');
     }
@@ -433,7 +417,7 @@ function determineImageType(features) {
     // Determine primary classification
     let type, confidence;
     
-    console.log('🔍 SCORE DEBUG: Classification scores:', {
+    logDebug('🔍 SCORE DEBUG: Classification scores:', {
         medicalScore: medicalScore.toFixed(3),
         nonMedicalScore: nonMedicalScore.toFixed(3),
         xrayScore: xrayScore.toFixed(3),
@@ -441,7 +425,7 @@ function determineImageType(features) {
         ctScore: ctScore.toFixed(3)
     });
     
-    if (medicalScore > nonMedicalScore && medicalScore > 0.4) {
+    if (medicalScore > nonMedicalScore && medicalScore > CONFIG.MEDICAL_SCORE_MIN) {
         // It's a medical image, determine specific type
         if (statistics.mean < 0.4) {
             xrayScore += 0.4;
@@ -476,7 +460,7 @@ function determineImageType(features) {
         details.push('Appears to be a non-medical image (photo, illustration, object)');
     }
     
-    console.log('🔍 FINAL DEBUG: Final classification:', { 
+    logDebug('🔍 FINAL DEBUG: Final classification:', { 
         type, 
         confidence: confidence.toFixed(3), 
         details: details.slice(0, 3) // Show first 3 details
@@ -528,7 +512,7 @@ self.onmessage = async function(e) {
                     const imageInfo = await preprocessImage(imageData);
                     
                     // Classify image type
-                    const results = await classifyImageType(imageInfo);
+                    const results = await determineImageType(extractClassificationFeatures(imageInfo));
                     
                     return results;
                 })();
@@ -542,6 +526,7 @@ self.onmessage = async function(e) {
                         results: results
                     });
                 } catch (timeoutError) {
+                    // eslint-disable-next-line no-console
                     console.error('Analysis timeout or error:', timeoutError);
                     self.postMessage({
                         type: 'complete',
@@ -559,6 +544,7 @@ self.onmessage = async function(e) {
                 self.postMessage({ type: 'error', error: 'Unknown message type' });
         }
     } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Image type worker error:', error);
         self.postMessage({ type: 'error', error: error.message });
     }
