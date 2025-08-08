@@ -15,52 +15,61 @@ class ImageAnalyzer {
     }
 
     async analyzeImage(file) {
-        const results = {
-            metadata: null,
-            noise: null,
-            compression: null,
-            statistical: null,
-            frequency: null,
-            mriDetection: null,
-            mriAnalysis: null,
-            ctDetection: null,
-            ctAnalysis: null,
-            overall: null
-        };
+        const start = Date.now();
+        const results = await this.runClassicalForensics(file);
 
-        try {
-            // Analyze metadata
-            results.metadata = await this.analysisMethods.metadata(file);
-            
-            // Create image element for pixel analysis
-            const img = await this.createImageElement(file);
-            
-            // Analyze various aspects
-            results.noise = await this.analysisMethods.noise(img);
-            results.compression = await this.analysisMethods.compression(img);
-            results.statistical = await this.analysisMethods.statistical(img);
-            results.frequency = await this.analysisMethods.frequency(img);
-            
-            // Detect image type and analyze accordingly
-            results.mriDetection = await this.analysisMethods.mriDetection(img);
-            results.ctDetection = await this.analysisMethods.ctDetection(img);
-            
-            if (results.mriDetection.isMRI) {
-                results.mriAnalysis = await this.analysisMethods.mriAnalysis(img);
+        let backend = null;
+        if (window.AppConfig?.FEATURES?.ENABLE_BACKEND && window.AppConfig?.BACKEND_URL) {
+            try {
+                backend = await this.runBackendForensics(file);
+            } catch (e) {
+                backend = { confidence: 50, status: 'Backend unavailable', details: ['Deep forensics failed'] };
             }
-            
-            if (results.ctDetection.isCT) {
-                results.ctAnalysis = await this.analysisMethods.ctAnalysis(img);
-            }
-            
-            // Calculate overall score
-            results.overall = this.calculateOverallScore(results);
-            
-            return results;
-        } catch (error) {
-            console.error('Image analysis error:', error);
-            throw error;
         }
+
+        const overall = this.combine(results, backend);
+        return {
+            overall,
+            metadata: results.metadata,
+            noise: results.noise,
+            compression: results.compression,
+            statistical: results.statistical,
+            frequency: results.frequency,
+            mriDetection: results.mriDetection,
+            mriAnalysis: results.mriAnalysis,
+            ctDetection: results.ctDetection,
+            ctAnalysis: results.ctAnalysis,
+            backend: backend || undefined,
+            elapsedMs: Date.now() - start
+        };
+    }
+
+    async runClassicalForensics(file) {
+        // TODO: implement: PRNU/FPN residuals, enhanced ELA, frequency ratios, series checks (for DICOM)
+        // For now, re-use existing methods, return structured
+        const base = await this.basicAnalyze(file);
+        return base;
+    }
+
+    async runBackendForensics(file) {
+        const url = window.AppConfig.BACKEND_URL + '/analyze';
+        const blob = file; // already a File
+        const form = new FormData();
+        form.append('image', blob, blob.name);
+        const resp = await fetch(url, { method: 'POST', body: form });
+        if (!resp.ok) throw new Error('backend error');
+        return await resp.json();
+    }
+
+    combine(classical, backend) {
+        // Simple weighted fusion placeholder; calibrate later
+        const cw = backend ? 0.6 : 1.0;
+        const bw = backend ? 0.4 : 0.0;
+        const c = Math.round((classical.overall.confidence || 50) * cw + (backend?.confidence || 0) * bw);
+        let status = classical.overall.status;
+        if (backend && backend.status) status = backend.status;
+        const details = [ ...(classical.overall.details || []), ...(backend?.details || []) ];
+        return { confidence: c, status, details };
     }
 
     async createImageElement(file) {

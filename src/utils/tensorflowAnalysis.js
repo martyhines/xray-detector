@@ -70,44 +70,49 @@ class TensorFlowAnalyzer {
 
 
     async analyzeImage(file) {
+        // If backend deep forensics is disabled, skip this module entirely
+        if (!window.AppConfig?.FEATURES?.ENABLE_BACKEND) {
+            // Short-circuit to fallback to avoid confusing timeouts
+            return {
+                confidence: 50,
+                status: 'Analysis Unavailable',
+                details: ['Deep AI analysis disabled'],
+                method: 'Fallback Analysis',
+                aiProbability: 0.5
+            };
+        }
+        
+        // Existing worker path (kept for future ONNX/TFJS use when enabled)
         // Ensure worker is ready before analysis
         if (!this.isWorkerReady) {
             await this.initWorker();
         }
-
+        
         // Wait for worker to be ready
         let attempts = 0;
-        while (!this.isWorkerReady && attempts < 40) { // doubled attempts
+        while (!this.isWorkerReady && attempts < 40) {
             await new Promise(resolve => setTimeout(resolve, 250));
             attempts++;
         }
-
+        
         if (!this.isWorkerReady) {
             throw new Error('Analysis worker failed to initialize after multiple attempts');
         }
-
+        
         try {
             this.updateModelStatus('Preparing image for analysis...');
-            
-            // Convert file to ImageData for worker
             const imageData = await this.fileToImageData(file);
-            
-            // Send analysis request to worker
             return new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     reject(new Error('Analysis timeout'));
-                }, 60000); // 60 second timeout
-                
-                // Set up one-time result handler
+                }, 60000);
                 const resultHandler = (e) => {
                     const { type, results, error } = e.data;
-                    
                     if (type === 'complete') {
                         clearTimeout(timeout);
                         this.worker.removeEventListener('message', resultHandler);
                         resolve(this.interpretResults(results));
                     } else if (type === 'progress') {
-                        // propagate progress to UI
                         this.updateModelStatus(results ? results.message || 'Working...' : 'Working...');
                     } else if (type === 'error') {
                         clearTimeout(timeout);
@@ -115,16 +120,9 @@ class TensorFlowAnalyzer {
                         reject(new Error(error));
                     }
                 };
-                
                 this.worker.addEventListener('message', resultHandler);
-                
-                // Send analysis request
-                this.worker.postMessage({
-                    type: 'analyze',
-                    data: { imageData }
-                });
+                this.worker.postMessage({ type: 'analyze', data: { imageData } });
             });
-            
         } catch (error) {
             console.error('Worker analysis error:', error);
             this.updateModelStatus('Analysis failed');
