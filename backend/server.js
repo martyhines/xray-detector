@@ -53,10 +53,12 @@ async function getOpenAI() {
 
 async function gptAdvisory(buffer, classicalHints = []) {
   const client = await getOpenAI();
-  if (!client) return null;
+  if (!client) return { text: null, error: 'sdk-not-available' };
   const hintText = classicalHints.filter(Boolean).slice(0, 10).join('; ');
   const system = 'You are a medical image forensics assistant. Provide concise, actionable guidance to a radiologist about potential AI generation or manipulation, citing specific forensic cues.';
   const user = `Context: ${hintText || 'No classical hints available'}. Task: Given these signals, provide 2-4 bullet point advisories on what to inspect (ELA hotspots, frequency anomalies, PRNU inconsistencies, metadata red flags), and a brief one-line verdict.`;
+  const controller = new AbortController();
+  const to = setTimeout(() => controller.abort(), 8000);
   try {
     const resp = await client.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -65,13 +67,16 @@ async function gptAdvisory(buffer, classicalHints = []) {
         { role: 'user', content: user }
       ],
       temperature: 0.2,
-      max_tokens: 200
+      max_tokens: 200,
+      signal: controller.signal
     });
     const text = resp.choices?.[0]?.message?.content?.trim();
-    return text || null;
+    return { text: text || null, error: null };
   } catch (e) {
     console.warn('OpenAI advisory failed:', e.message);
-    return null;
+    return { text: null, error: e.message || 'unknown-error' };
+  } finally {
+    clearTimeout(to);
   }
 }
 
@@ -104,10 +109,10 @@ app.post('/analyze', upload.single('image'), async (req, res) => {
     let base = await runOnnx(buffer);
     if (!base) base = simpleDeepForensicsPlaceholder(buffer);
 
-    // Collect simple hints for the prompt
     const hints = base.details || [];
-    const advisory = await gptAdvisory(buffer, hints);
-    if (advisory) base.details.push(`Advisory: ${advisory}`);
+    const { text, error } = await gptAdvisory(buffer, hints);
+    base.advisoryStatus = error ? `error: ${error}` : 'ok';
+    if (text) base.details.push(`Advisory: ${text}`);
 
     return res.json(base);
   } catch (e) {
@@ -123,6 +128,23 @@ app.get('/advisory-status', async (req, res) => {
     return res.json({ hasKey, sdkLoaded: !!client });
   } catch (e) {
     return res.status(500).json({ error: 'status check failed' });
+  }
+});
+
+app.get('/advisory-test', async (req, res) => {
+  try {
+    const client = await getOpenAI();
+    if (!client) return res.json({ ok: false, reason: 'sdk-not-available' });
+    const r = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: 'Return the single word: OK' }],
+      temperature: 0,
+      max_tokens: 5
+    });
+    const text = r.choices?.[0]?.message?.content?.trim();
+    return res.json({ ok: true, text });
+  } catch (e) {
+    return res.json({ ok: false, error: e.message || 'unknown-error' });
   }
 });
 
