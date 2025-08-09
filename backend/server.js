@@ -116,5 +116,15 @@ app.post('/analyze', upload.single('image'), async (req, res) => {
   }
 });
 
+app.get('/advisory-status', async (req, res) => {
+  try {
+    const hasKey = !!OPENAI_API_KEY;
+    const client = await getOpenAI();
+    return res.json({ hasKey, sdkLoaded: !!client });
+  } catch (e) {
+    return res.status(500).json({ error: 'status check failed' });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`Backend listening on ${PORT}`));
