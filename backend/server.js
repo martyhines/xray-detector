@@ -11,6 +11,9 @@ let onnxSession = null;
 const ONNX_MODEL_PATH = process.env.ONNX_MODEL_PATH || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 let openai = null;
+let sharp = null;
+const ONNX_INPUT_NAME = process.env.ONNX_INPUT_NAME || 'input';
+const ONNX_INPUT_SIZE = parseInt(process.env.ONNX_INPUT_SIZE || '224', 10);
 
 async function ensureOnnx() {
   if (!ONNX_MODEL_PATH) return null;
@@ -26,6 +29,33 @@ async function ensureOnnx() {
     onnxSession = await ort.InferenceSession.create(ONNX_MODEL_PATH);
   }
   return onnxSession;
+}
+
+async function ensureSharp() {
+  if (!sharp) {
+    try { sharp = require('sharp'); } catch { sharp = null; }
+  }
+  return sharp;
+}
+
+async function preprocessForOnnx(buffer) {
+  const s = await ensureSharp();
+  if (!s) return null;
+  const size = ONNX_INPUT_SIZE;
+  const img = await s(buffer).resize(size, size, { fit: 'cover' }).toFormat('png').raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = img; // RGBA
+  const rgb = new Float32Array(size * size * 3);
+  let di = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] / 255;
+    const g = data[i + 1] / 255;
+    const b = data[i + 2] / 255;
+    rgb[di] = r; // R
+    rgb[di + size * size] = g; // G
+    rgb[di + 2 * size * size] = b; // B
+    di++;
+  }
+  return new ort.Tensor('float32', rgb, [1, 3, size, size]);
 }
 
 function simpleDeepForensicsPlaceholder(buffer) {
@@ -109,12 +139,15 @@ app.get('/health', (req, res) => {
 async function runOnnx(buffer) {
   const session = await ensureOnnx();
   if (!session) return null;
-  // Minimal preprocessing: assume model takes [1,3,224,224] float
-  // Here we simply pass a zero tensor as placeholder; replace with real preprocessing
-  const size = 224;
-  const data = new Float32Array(size * size * 3);
-  const tensor = new ort.Tensor('float32', data, [1, 3, size, size]);
-  const feeds = { input: tensor };
+  // Try real preprocessing, fallback to zero tensor if not available
+  let tensor = null;
+  try { tensor = await preprocessForOnnx(buffer); } catch { tensor = null; }
+  if (!tensor) {
+    const size = ONNX_INPUT_SIZE;
+    tensor = new Float32Array(size * size * 3);
+    tensor = new ort.Tensor('float32', tensor, [1, 3, size, size]);
+  }
+  const feeds = { [ONNX_INPUT_NAME]: tensor };
   const out = await session.run(feeds);
   const first = out[Object.keys(out)[0]].data;
   const aiProb = first.length >= 2 ? first[1] : (first[0] || 0.5);
