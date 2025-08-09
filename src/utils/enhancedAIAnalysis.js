@@ -7,17 +7,10 @@ class EnhancedAIAnalyzer {
     }
 
     initializeDetectionMethods() {
+        // Only include methods that currently provide meaningful signals
         this.detectionMethods = {
             frequencyAnalysis: (imageData) => this.analyzeFrequencyArtifacts(imageData),
-            noiseInconsistency: (imageData) => this.analyzeNoiseInconsistency(imageData),
-            compressionArtifacts: (imageData) => this.analyzeCompressionArtifacts(imageData),
-            statisticalAnomalies: (imageData) => this.analyzeStatisticalAnomalies(imageData),
-            edgeAnalysis: (imageData) => this.analyzeEdgePatterns(imageData),
-            textureAnalysis: (imageData) => this.analyzeTexturePatterns(imageData),
-            colorSpaceAnalysis: (imageData) => this.analyzeColorSpace(imageData),
-            metadataAnalysis: (file) => this.analyzeMetadataPatterns(file),
-            perceptualHashing: (imageData) => this.perceptualHashAnalysis(imageData),
-            deepLearningFeatures: (imageData) => this.analyzeDeepLearningFeatures(imageData)
+            noiseInconsistency: (imageData) => this.analyzeNoiseInconsistency(imageData)
         };
     }
 
@@ -40,24 +33,12 @@ class EnhancedAIAnalyzer {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
 
-            // Run all detection methods
-            const methodResults = await Promise.all([
-                this.detectionMethods.frequencyAnalysis(imageData),
-                this.detectionMethods.noiseInconsistency(imageData),
-                this.detectionMethods.compressionArtifacts(imageData),
-                this.detectionMethods.statisticalAnomalies(imageData),
-                this.detectionMethods.edgeAnalysis(imageData),
-                this.detectionMethods.textureAnalysis(imageData),
-                this.detectionMethods.colorSpaceAnalysis(imageData),
-                this.detectionMethods.metadataAnalysis(file),
-                this.detectionMethods.perceptualHashing(imageData),
-                this.detectionMethods.deepLearningFeatures(imageData)
-            ]);
+            // Run enabled detection methods only
+            const methodEntries = Object.entries(this.detectionMethods);
+            const methodResults = await Promise.all(methodEntries.map(([_, fn]) => fn(imageData)));
 
-            // Store individual method results
-            const methodNames = Object.keys(this.detectionMethods);
-            methodNames.forEach((method, index) => {
-                results.methods[method] = methodResults[index];
+            methodEntries.forEach(([name], index) => {
+                results.methods[name] = methodResults[index];
             });
 
             // Calculate overall confidence and AI probability
