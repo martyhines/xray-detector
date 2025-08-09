@@ -33,7 +33,7 @@
       }
     },
     ADVISORY: {
-      ENABLE_GPT_ADVISORY: false // server-side uses OPENAI_API_KEY; this flag is informational
+      ENABLE_GPT_ADVISORY: true // server-side uses OPENAI_API_KEY; this flag controls UI display
     }
   };
   // Expose globally

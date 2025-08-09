@@ -113,6 +113,7 @@ class ResultDisplay {
             breakdownSection.innerHTML = `
                 <h4>Detailed Analysis</h4>
                 <div class="breakdown-content"></div>
+                <div class="advisory-content"></div>
             `;
             
             const resultCard = document.querySelector('.result-card');
@@ -126,6 +127,38 @@ class ResultDisplay {
         if (breakdownContent) {
             breakdownContent.innerHTML = this.generateBreakdownHTML(results);
         }
+
+        // Populate advisory if enabled and present
+        const advisoryContainer = breakdownSection.querySelector('.advisory-content');
+        if (advisoryContainer) {
+            advisoryContainer.innerHTML = this.generateAdvisoryHTML(results);
+        }
+    }
+
+    generateAdvisoryHTML(results) {
+        if (!window.AppConfig?.ADVISORY?.ENABLE_GPT_ADVISORY) return '';
+        const backend = results.backend;
+        if (!backend || backend.advisoryStatus !== 'ok') return '';
+        const advisoryLines = (backend.details || []).filter(d => typeof d === 'string' && d.startsWith('Advisory: '));
+        if (!advisoryLines.length) return '';
+        const advisoryText = advisoryLines[0].replace('Advisory: ', '').trim();
+        const bullets = advisoryText.split('\n').map(s => s.trim()).filter(Boolean);
+        const ts = results.timestamp || new Date().toISOString();
+        return `
+            <div class="advisory-panel">
+                <div class="advisory-header">
+                    <h4><i class="fas fa-user-md"></i> Expert advisory (AI-generated)</h4>
+                    <button class="btn btn-secondary btn-small" onclick="(function(btn){ const p=btn.closest('.advisory-panel'); const b=p.querySelector('.advisory-body'); b.style.display=b.style.display==='none'?'block':'none';})(this)">Toggle</button>
+                </div>
+                <div class="advisory-body" style="display: none;">
+                    <div class="advisory-disclaimer"><i class="fas fa-info-circle"></i> This advisory is AI-generated, for guidance only. Not a medical diagnosis.</div>
+                    <ul class="advisory-list">
+                        ${bullets.map(b => `<li>${b}</li>`).join('')}
+                    </ul>
+                    <div class="advisory-meta">Source: GPT advisory via backend • ${ts}</div>
+                </div>
+            </div>
+        `;
     }
 
     generateBreakdownHTML(results) {
