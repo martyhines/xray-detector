@@ -10,6 +10,7 @@ let ort = null;
 let onnxSession = null;
 const ONNX_MODEL_PATH = process.env.ONNX_MODEL_PATH || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+let openai = null;
 
 async function ensureOnnx() {
   if (!ONNX_MODEL_PATH) return null;
@@ -36,6 +37,44 @@ function simpleDeepForensicsPlaceholder(buffer) {
   return { confidence, status: confidence >= 70 ? 'Likely Authentic' : confidence >= 40 ? 'Uncertain' : 'Likely AI Generated', details };
 }
 
+async function getOpenAI() {
+  if (!OPENAI_API_KEY) return null;
+  if (!openai) {
+    try {
+      const { OpenAI } = require('openai');
+      openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+    } catch (e) {
+      console.warn('OpenAI SDK not installed');
+      return null;
+    }
+  }
+  return openai;
+}
+
+async function gptAdvisory(buffer, classicalHints = []) {
+  const client = await getOpenAI();
+  if (!client) return null;
+  const hintText = classicalHints.filter(Boolean).slice(0, 10).join('; ');
+  const system = 'You are a medical image forensics assistant. Provide concise, actionable guidance to a radiologist about potential AI generation or manipulation, citing specific forensic cues.';
+  const user = `Context: ${hintText || 'No classical hints available'}. Task: Given these signals, provide 2-4 bullet point advisories on what to inspect (ELA hotspots, frequency anomalies, PRNU inconsistencies, metadata red flags), and a brief one-line verdict.`;
+  try {
+    const resp = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ],
+      temperature: 0.2,
+      max_tokens: 200
+    });
+    const text = resp.choices?.[0]?.message?.content?.trim();
+    return text || null;
+  } catch (e) {
+    console.warn('OpenAI advisory failed:', e.message);
+    return null;
+  }
+}
+
 app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
@@ -57,12 +96,6 @@ async function runOnnx(buffer) {
   return { confidence, status, details: ['Server ONNX inference executed'] };
 }
 
-async function gptAdvisoryStub() {
-  if (!OPENAI_API_KEY) return null;
-  // Placeholder to avoid adding dependency; real impl would call OpenAI API
-  return 'GPT advisory: consider checking ELA hotspots and noise residual inconsistencies.';
-}
-
 app.post('/analyze', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'no file' });
@@ -71,8 +104,10 @@ app.post('/analyze', upload.single('image'), async (req, res) => {
     let base = await runOnnx(buffer);
     if (!base) base = simpleDeepForensicsPlaceholder(buffer);
 
-    const advisory = await gptAdvisoryStub();
-    if (advisory) base.details.push(advisory);
+    // Collect simple hints for the prompt
+    const hints = base.details || [];
+    const advisory = await gptAdvisory(buffer, hints);
+    if (advisory) base.details.push(`Advisory: ${advisory}`);
 
     return res.json(base);
   } catch (e) {
