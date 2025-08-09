@@ -41,10 +41,10 @@ async function getOpenAI() {
   if (!OPENAI_API_KEY) return null;
   if (!openai) {
     try {
-      const { OpenAI } = require('openai');
+      const OpenAI = require('openai');
       openai = new OpenAI({ apiKey: OPENAI_API_KEY });
     } catch (e) {
-      console.warn('OpenAI SDK not installed');
+      console.warn('OpenAI SDK init failed:', e.message);
       return null;
     }
   }
