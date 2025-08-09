@@ -60,19 +60,41 @@ async function gptAdvisory(buffer, classicalHints = []) {
   const controller = new AbortController();
   const to = setTimeout(() => controller.abort(), 8000);
   try {
-    const resp = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user }
-      ],
-      temperature: 0.2,
-      max_tokens: 200,
-      signal: controller.signal
-    });
+    // Pass signal via options (second arg), not in params
+    const resp = await client.chat.completions.create(
+      {
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user }
+        ],
+        temperature: 0.2,
+        max_tokens: 200
+      },
+      { signal: controller.signal }
+    );
     const text = resp.choices?.[0]?.message?.content?.trim();
     return { text: text || null, error: null };
   } catch (e) {
+    // If 400 due to unrecognized arg (older SDK), retry once without signal
+    if (String(e.message || '').includes('Unrecognized request argument') || String(e.status || '').startsWith('400')) {
+      try {
+        const resp = await client.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ],
+          temperature: 0.2,
+          max_tokens: 200
+        });
+        const text = resp.choices?.[0]?.message?.content?.trim();
+        return { text: text || null, error: null };
+      } catch (e2) {
+        console.warn('OpenAI advisory retry failed:', e2.message);
+        return { text: null, error: e2.message || 'unknown-error' };
+      }
+    }
     console.warn('OpenAI advisory failed:', e.message);
     return { text: null, error: e.message || 'unknown-error' };
   } finally {
