@@ -137,7 +137,7 @@ class ResultDisplay {
 
     generateAdvisoryHTML(results) {
         if (!window.AppConfig?.ADVISORY?.ENABLE_GPT_ADVISORY) return '';
-        const backend = results.backend;
+        const backend = results.backend || (results.traditional && results.traditional.backend) || null;
         if (!backend || backend.advisoryStatus !== 'ok') return '';
         const advisoryLines = (backend.details || []).filter(d => typeof d === 'string' && d.startsWith('Advisory: '));
         if (!advisoryLines.length) return '';

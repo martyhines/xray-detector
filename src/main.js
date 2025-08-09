@@ -167,15 +167,24 @@ class XRayDetectorApp {
 
     async performAnalysis(file) {
         try {
-            // Run traditional, TensorFlow, and enhanced AI analysis in parallel
-            const [traditionalResults, tensorflowResults, enhancedAIResults] = await Promise.all([
+            const onnxEnabled = !!(window.AppConfig?.FEATURES?.ENABLE_ONNX_WEB);
+            const onnxPromise = onnxEnabled && typeof ONNXWebAnalyzer !== 'undefined' ? this.runONNXWebAnalysis(file) : Promise.resolve({
+                confidence: 50,
+                status: 'Analysis Unavailable',
+                details: ['ONNX Web disabled'],
+                method: 'ONNX Fallback',
+                aiProbability: 0.5
+            });
+            // Run traditional, TensorFlow, ONNX, and enhanced AI analysis in parallel
+            const [traditionalResults, tensorflowResults, onnxResults, enhancedAIResults] = await Promise.all([
                 this.runTraditionalAnalysis(file),
                 this.runTensorFlowAnalysis(file),
+                onnxPromise,
                 this.runEnhancedAIAnalysis(file)
             ]);
 
             // Combine results with weighted average
-            const combinedConfidence = this.combineResults(traditionalResults, tensorflowResults, enhancedAIResults);
+            const combinedConfidence = this.combineResults(traditionalResults, tensorflowResults, enhancedAIResults, onnxResults);
             
             return {
                 confidence: combinedConfidence.confidence,
@@ -185,7 +194,9 @@ class XRayDetectorApp {
                 // Include detailed results for the breakdown
                 traditional: traditionalResults,
                 tensorflow: tensorflowResults,
-                enhancedAI: enhancedAIResults
+                enhancedAI: enhancedAIResults,
+                onnx: onnxResults,
+                backend: traditionalResults.backend
             };
         } catch (error) {
             console.error('Analysis error:', error);
@@ -212,7 +223,8 @@ class XRayDetectorApp {
             mriDetection: results.mriDetection,
             mriAnalysis: results.mriAnalysis,
             ctDetection: results.ctDetection,
-            ctAnalysis: results.ctAnalysis
+            ctAnalysis: results.ctAnalysis,
+            backend: results.backend
         };
     }
 
@@ -279,52 +291,35 @@ class XRayDetectorApp {
         }
     }
 
-    combineResults(traditional, tensorflow, enhancedAI) {
-        // Adjust weights based on which analyses are available
-        let traditionalWeight, tensorflowWeight, enhancedAIWeight;
-        if (tensorflow.method === 'Fallback Analysis' && enhancedAI.method === 'Enhanced AI Fallback') {
-            // If both AI methods failed, rely more on traditional analysis
-            traditionalWeight = 0.8;
-            tensorflowWeight = 0.1;
-            enhancedAIWeight = 0.1;
-        } else if (tensorflow.method === 'Fallback Analysis') {
-            // If only TensorFlow failed, use enhanced AI more
-            traditionalWeight = 0.2;
-            tensorflowWeight = 0.1;
-            enhancedAIWeight = 0.7;
-        } else if (enhancedAI.method === 'Enhanced AI Fallback') {
-            // If only enhanced AI failed, use TensorFlow more
-            traditionalWeight = 0.2;
-            tensorflowWeight = 0.7;
-            enhancedAIWeight = 0.1;
-        } else {
-            // All methods available - enhanced AI gets highest weight
-            traditionalWeight = 0.2;
-            tensorflowWeight = 0.3;
-            enhancedAIWeight = 0.5;
-        }
+    combineResults(traditional, tensorflow, enhancedAI, onnx) {
+        const ew = (window.AppConfig && window.AppConfig.WEIGHTS && window.AppConfig.WEIGHTS.ENSEMBLE) || {
+            traditional: 0.3,
+            onnxWeb: 0.3,
+            tensorflow: 0.0,
+            enhancedAI: 0.4
+        };
+        // Adjust for fallbacks
+        const tWeight = ew.traditional;
+        const tfWeight = (tensorflow.method === 'Fallback Analysis') ? 0 : ew.tensorflow;
+        const onnxWeight = (onnx.method === 'ONNX Fallback') ? 0 : ew.onnxWeb;
+        const eWeight = (enhancedAI.method === 'Enhanced AI Fallback') ? 0 : ew.enhancedAI;
+        const sum = tWeight + tfWeight + onnxWeight + eWeight || 1;
         const combinedConfidence = Math.round(
-            (traditional.confidence * traditionalWeight) +
-            (tensorflow.confidence * tensorflowWeight) +
-            (enhancedAI.confidence * enhancedAIWeight)
+            (traditional.confidence * tWeight + tensorflow.confidence * tfWeight + (onnx.confidence || 50) * onnxWeight + enhancedAI.confidence * eWeight) / sum
         );
-        // Calculate combined AI probability
         const combinedAIProbability = (
-            (traditional.aiProbability || 0.5) * traditionalWeight +
-            (tensorflow.aiProbability || 0.5) * tensorflowWeight +
-            (enhancedAI.aiProbability || 0.5) * enhancedAIWeight
+            ((traditional.aiProbability || 0.5) * tWeight + (tensorflow.aiProbability || 0.5) * tfWeight + (onnx.aiProbability || 0.5) * onnxWeight + (enhancedAI.aiProbability || 0.5) * eWeight) / sum
         );
-        // Determine status based on combined confidence and AI probability
         let status, details;
         if (combinedAIProbability > 0.7) {
             status = 'Likely AI Generated';
-            details = 'Multiple advanced detection methods indicate AI generation';
+            details = 'Multiple detection methods indicate AI generation';
         } else if (combinedAIProbability > 0.4) {
             status = 'Suspicious - Manual Review Recommended';
-            details = 'Mixed indicators detected, enhanced analysis suggests potential AI generation';
+            details = 'Mixed indicators; further review advised';
         } else {
             status = 'Likely Authentic';
-            details = 'Advanced analysis indicates authentic medical image';
+            details = 'Ensemble indicates authentic medical image';
         }
         return {
             confidence: combinedConfidence,
@@ -332,6 +327,29 @@ class XRayDetectorApp {
             details: [details],
             aiProbability: combinedAIProbability
         };
+    }
+
+    async runONNXWebAnalysis(file) {
+        try {
+            const analyzer = new ONNXWebAnalyzer();
+            const results = await analyzer.analyzeImage(file);
+            return {
+                confidence: results.confidence,
+                status: results.status,
+                details: results.details,
+                method: results.method,
+                aiProbability: results.aiProbability
+            };
+        } catch (e) {
+            console.warn('ONNX Web analysis failed:', e);
+            return {
+                confidence: 50,
+                status: 'Analysis Unavailable',
+                details: ['ONNX Web analysis failed'],
+                method: 'ONNX Fallback',
+                aiProbability: 0.5
+            };
+        }
     }
 
     displayResults(result, analysisTime) {
